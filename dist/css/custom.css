@@ -1,0 +1,21 @@
+/* ETA / Locator cancelled rows */
+.cancelled-row td {
+    text-decoration: line-through;
+    color: #6c757d !important; /* muted gray */
+}
+.small-box {
+  border-radius: 12px;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s;
+}
+.small-box:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+}
+.small-box .inner h3 {
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+.small-box .inner p {
+  font-size: 1rem;
+  margin-bottom: 0;
+}

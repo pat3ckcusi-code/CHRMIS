@@ -1,0 +1,10 @@
+PHPExcel test started
+PHPExcel loaded successfully
+Excel object created
+Headers sent, saving output
+PHPExcel test completed successfully
+PHPExcel test started
+PHPExcel loaded successfully
+Excel object created
+Headers sent, saving output
+PHPExcel test completed successfully

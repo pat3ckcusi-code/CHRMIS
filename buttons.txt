@@ -1,0 +1,161 @@
+{ data: 'user_id', title: 'Actions', className: 'text-center', sortable: false,
+        render: function(data, type, row, meta) {
+        if ('<?php echo $access_level?>' === 'System Administrator') {
+            return `
+            <button class="btn btn-sm bg-primary mr-2" data-action="edit_user" data-username="${row.username}" data-id="${data}"><i class="fa fa-edit mr-2"></i>Edit</button>
+            <button class="btn btn-sm bg-danger" data-action="delete_user" data-username="${row.username}" data-id="${data}"><i class="fa fa-trash-alt mr-2"></i>Delete</button>
+            `;
+          } else {
+             if (row.access_level !== 'System Administrator') {
+               return `
+               <button class="btn btn-sm bg-primary mr-2" data-action="edit_user" data-username="${row.username}" data-id="${data}"><i class="fa fa-edit mr-2"></i>Edit</button>
+               <button class="btn btn-sm bg-danger" data-action="delete_user" data-username="${row.username}" data-id="${data}"><i class="fa fa-trash-alt mr-2"></i>Delete</button>
+               `;
+             }
+             //return '';
+           }
+         }
+       },
+
+
+
+
+
+//Add User Account Modal
+      /*$('[data-action="add_user"]').click(function() {
+        document.getElementById('addUserForm').reset();
+      });
+
+      // Add User Account
+      /*$('#addUserForm').submit(function(e) {
+        e.preventDefault();
+        Swal.fire({
+          title: 'Information',
+          text: "Are you sure you want to add this User?",
+          type: 'info',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Yes, save it!'
+        }).then((result) => {
+          if (result.value) {
+            $.ajax({
+              url: this.action,
+              type: 'post',
+              processData: false,
+              contentType: false,
+              data: new FormData(this)
+            }).then(function(response) {
+              console.log(response);
+              if(response.success){
+                $('#addUserForm')[0].reset();
+                $('#addUserModal').modal('hide');
+                if(usersTable) {
+                  usersTable.ajax.reload(null, false);
+                }
+                Swal.fire('Success!', response.message, 'success')
+              }else{
+                Swal.fire('Warning!', response.message, 'warning')
+              }
+
+            })
+          }
+        })
+      });*/
+
+      // Update User Account Modal
+      /*$('#users_table').on('click', '[data-action="edit_user"]', function() {
+
+        let parentRow = $(this).parents('tr')[0];
+        let data = selectedData = usersTable.row(parentRow).data();
+
+        $('#viewupdateUserForm #e_user_id').val(data.user_id);
+        $('#viewupdateUserForm #e_user_id_no').val(data.user_id_no);
+        $('#viewupdateUserForm #e_first_name').val(data.first_name);
+        $('#viewupdateUserForm #e_middlename').val(data.middle_name);
+        $('#viewupdateUserForm #e_lastname').val(data.last_name);
+        $('#viewupdateUserForm #e_name_extension').val(data.name_extension);
+        $('#viewupdateUserForm #e_position').val(data.position);
+        $('#viewupdateUserForm #e_office').val(data.office);
+        $('#viewupdateUserForm #e_access_level').val(data.access_level);
+        $('#viewupdateUserForm #e_username').val(data.username);
+        $('#viewupdateUserForm #e_password').val(data.password);
+        $('#viewupdateUserForm .modal-title').text('View/Update User Account');
+        $('#viewupdateUserModal').modal('show');
+
+      });
+
+      // Update User Account
+      $('#viewupdateUserForm').submit(function(e) {
+        e.preventDefault();
+        Swal.fire({
+          title: 'Information',
+          text: "Are you sure you want to update this User?",
+          type: 'info',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Yes, update it!'
+        }).then((result) => {
+          if (result.value) {
+            $.ajax({
+              url: '../api/api_users.php',
+              type: 'put',
+              processData: false,
+              data: $('#viewupdateUserForm').serialize()
+            }).then(function(response) {
+              console.log(response);
+              if (!response.success){
+                Swal.fire('Warning!', response.message, 'warning')
+              }else{
+                if (usersTable) {
+                  usersTable.ajax.reload(null, false);
+                  Swal.fire('Success!', response.message, 'success')
+                }
+              }
+              $('#viewupdateUserForm')[0].reset();
+              $('.modal.show').modal('hide');
+            })
+          }
+        })
+
+      });
+
+
+      //Delete Accounts
+      /*$('#users_table').on('click', '[data-action="delete_user"]', function() {
+        let currentId = $(this).attr('data-id');
+        let username = $(this).attr('data-username').toUpperCase();
+        let session_userID = '<?php echo $currentuserID;?>';
+        if(session_userID === currentId){
+          Swal.fire('Warning!', `ATS User: ${username} cannot be deleted because the account is currently signed in to the system.`, 'warning');
+        }else{
+          Swal.fire({
+            title: 'Information',
+            text: `This action will delete the account of User: ${username}. Are you sure?`,
+            type: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, delete it!'
+          }).then((result) => {
+            if (result.value) {
+              $.ajax({
+                url: '../api/api_users.php',
+                type: 'DELETE',
+                data: { user_id: currentId }
+              }).then(function(response) {
+                console.log(response);
+                if(response.success){
+                  if (usersTable) {
+                    usersTable.ajax.reload(null, false);
+                  }
+                  Swal.fire('Success!', response.message, 'success')
+                }else{
+                  Swal.fire('Warning!', response.message, 'warning')
+                }
+              })
+            }
+          })
+        }
+      });*/
