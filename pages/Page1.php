@@ -109,7 +109,7 @@ while($child = $childquery->fetch())
           <td class="text-center align-middle fw-bold">EMPLOYEE NO.</td>
           <td colspan="3">
             <input class="form-control form-control-sm" name="txtEmpNo" id="txtEmpNo"
-                   value="<?php echo htmlspecialchars($empNoValue); ?>" required>
+                   value="<?php echo htmlspecialchars($empNoValue); ?>" required readonly>
           </td>
         </tr>
         <tr>
