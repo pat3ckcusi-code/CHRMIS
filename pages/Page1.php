@@ -305,13 +305,13 @@ while($child = $childquery->fetch())
                 <td class="text-center align-middle fw-bold">SEX</td>
                 <td>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="txtSex" id="male" value="Male" 
-                        <?php if($row['Gender']=='Male') echo 'checked'; ?>>
+                        <input class="form-check-input" type="radio" name="txtSex" id="male" value="MALE" 
+                        <?php if($row['Gender']=='MALE') echo 'checked'; ?>>
                         <label class="form-check-label" for="male">Male</label>
                         </div>
                         <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="txtSex" id="female" value="Female" 
-                        <?php if($row['Gender']=='Female') echo 'checked'; ?>>        
+                        <input class="form-check-input" type="radio" name="txtSex" id="female" value="MALE" 
+                        <?php if($row['Gender']=='FEMALE') echo 'checked'; ?>>        
                         <label class="form-check-label" for="female">Female</label>
                     </div>
                 </td>
@@ -323,15 +323,15 @@ while($child = $childquery->fetch())
                 <td>
                     <?php 
                     $civilStatus = $row['Civil'];
-                    $statuses = ['Single','Married','Widowed','Separated','Others'];
+                    $statuses = ['SINGLE','MARRIED','WIDOWED','SEPARATED','OTHERS'];
                     foreach ($statuses as $s) {
                         $checked = ($civilStatus==$s)?'checked':'';
                         echo '<div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="rdCivil" value="'.$s.'" '.$checked.'>
+                                <input class="form-check-input" type="radio" name="rdCivil" value="'.strtoupper($s).'" '.$checked.'>
                                 <label class="form-check-label">'.$s.'</label>
                             </div>';
                     }
-                    ?>            
+                    ?>              
                 </td>
                 </tr>
 
