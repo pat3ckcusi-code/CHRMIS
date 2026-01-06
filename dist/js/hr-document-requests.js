@@ -22,6 +22,10 @@ $(document).ready(function() {
           if(r.status === 'Rejected' || r.status === 'Completed') return;
 
           const requestedOn = new Date(r.requested_on).toLocaleString('en-US', { hour12: true });
+          const fullName = r.Fname
+          + (r.Mname ? ' ' + r.Mname : '')
+          + ' ' + r.Lname
+          + (r.Extension ? ' ' + r.Extension : '');
           let actions = '';
 
           if(r.status === 'Requested') {
@@ -37,11 +41,13 @@ $(document).ready(function() {
 
           const rowNode = table.row.add([
             r.EmpNo,
+            fullName,
+            r.Dept,
             r.document_type,
             r.purpose || '—',
             requestedOn,
             r.status,
-            r.hr_notes || '—',
+            r.remarks || '—',
             actions
           ]).draw(false).node();
 

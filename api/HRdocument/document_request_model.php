@@ -18,6 +18,8 @@ class DocumentRequestModel {
                 r.status,
                 r.hr_notes AS remarks,
                 e.Fname,
+                e.Mname,
+                e.Extension,
                 e.Lname,
                 e.EMail,
                 e.Dept

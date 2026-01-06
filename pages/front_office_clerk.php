@@ -64,6 +64,8 @@ if ($Lrow['Dept'] !== 'City Human Resource Management Department') {
                   <thead class="thead-light">
                     <tr>
                       <th>Emp No.</th>
+                      <th>Employee Name</th>
+                      <th>Department</th>
                       <th>Document Type</th>
                       <th>Purpose</th>
                       <th>Requested On</th>
