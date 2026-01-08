@@ -4,17 +4,6 @@ function get_user_by_id($pdo, $user_id) {
   $statement = $pdo->query($query);
   return $statement->fetch();
 }
-//alert($('#a_user_id_no').val());
-function get_user_result($pdo, $access_level) {
-    if ($access_level == 'RO') {
-    $query = "SELECT * FROM tbl_checklist"; 
-  } else
-    {
-    $query = "SELECT * FROM tbl_checklist WHERE Office = '".$access_level."'";
-    }    
-    $statement = $pdo->query($query);
-    return $statement->fetchAll();
-}
 
 //Employee List
 function get_all_EmpList($pdo) {
@@ -82,37 +71,6 @@ function get_employee_by_id($pdo, $empId) {
     $stmt = $pdo->prepare($query);
     $stmt->execute([$empId]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-
-
-
-
-function add_user($pdo, $data) {
-  extract($data);
-  $query = "INSERT INTO tbl_checklist ";
-  $query .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-  $pdo->beginTransaction();
-  //try {
-    $statement = $pdo->prepare($query);
-    $statement->execute([ '', $user_id_no, $user_name, $user_sex, $user_age, $user_office, $user_date, $user_temp, $item1, $item2, $item3, $item4, $item5, $item6, $item7 ]);
-    $insert_id = $pdo->lastInsertId();       
-    $pdo->commit();
-    $resp = [
-      'success' => true,
-      'status' => 'success',
-      'message' => 'Employee Record was successfully created!',
-      'insert_id' => $insert_id
-      ];   
-  // } catch (\Exception $e) {
-  //   $resp = [
-  //     'success' => false,
-  //     'status' => 'failed',
-  //     'message' => 'Duplicate entry!',
-  //   ];
-  //   $pdo->rollBack();
-  // }
-  // return $resp;
 }
 
 // Add new employee + initialize leave credits

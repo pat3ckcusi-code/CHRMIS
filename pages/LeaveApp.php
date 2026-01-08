@@ -82,12 +82,12 @@ date_default_timezone_set('Asia/Manila');
 												$Leavequery = $pdo->query("
 													SELECT f.LeaveID, 
 														CONCAT(i.Fname, ' ', i.Mname, ' ', i.Lname) AS Name, 
-														i.Dept, f.LeaveType, f.DateFiled, f.Purpose, f.DateFrom, 
-														f.DateTo, f.NumDays 
+														i.Dept, f.LeaveTypeCode, f.DateFiled, f.Purpose, f.DateFrom, 
+														f.DateTo, f.TotalDays AS NumDays 
 													FROM filedleave f, i 
 													WHERE f.EmpNo = i.EmpNo 
 													AND i.Dept = '". $_SESSION['Dept'] ."' 
-													AND f.Remarks = '". $_SESSION['Status'] ."'
+													AND f.Status = '". $_SESSION['Status'] ."'
 												");
 											} else {
 												$Leavequery = $pdo->query("

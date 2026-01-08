@@ -226,12 +226,12 @@
                       <p>Add New Employee</p>
                     </a>
                   </li>
-                  <li class="nav-item">
+                  <!-- <li class="nav-item">
                     <a href="UpdateDateHired.php" class="nav-link">
                       <i class="fa fa-address-card"></i>
                       <p>Update Employee Date Hired</p>
                     </a>
-                  </li>   
+                  </li>    -->
                 </ul>
               </nav>
           <?php 

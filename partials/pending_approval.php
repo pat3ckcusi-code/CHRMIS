@@ -54,6 +54,7 @@ $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
       <th>Date From</th>
       <th>Date To</th>
       <th>Days</th>
+      <th>Reason</th>
       <th>Status</th>
       <th>Action</th>
     </tr>
@@ -73,6 +74,7 @@ $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
           <td><?= htmlspecialchars(date("M d, Y", strtotime($app['DateFrom']))) ?></td>
           <td><?= htmlspecialchars(date("M d, Y", strtotime($app['DateTo']))) ?></td>
           <td><?= $numDays ?></td>
+          <td><?= htmlspecialchars($app['Reason'] ?: '--') ?></td>
           <td><span class="badge badge-info">For Recommendation</span></td>
           <td>
             <button class="btn btn-success btn-sm approve-leave-btn" data-id="<?= $app['LeaveID'] ?>"><i class="fas fa-check"></i> Approve</button>
@@ -81,7 +83,7 @@ $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
         </tr>
       <?php endforeach; ?>
     <?php else: ?>
-      <tr><td colspan="7" class="text-center text-muted">No pending leave applications.</td></tr>
+      <tr><td colspan="8" class="text-center text-muted">No pending leave applications.</td></tr>
     <?php endif; ?>
   </tbody>
 </table>
