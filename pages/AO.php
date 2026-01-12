@@ -135,9 +135,7 @@ $Lrow = $Deptquery->fetch(PDO::FETCH_ASSOC);
 include_once('../partials/footer.php');
 // include("../partials/modals/modalpassword.php");
 ?>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Using global SweetAlert2 and jQuery loaded in partials/core_javascript.php -->
 <script>
 $(document).ready(function() {
        

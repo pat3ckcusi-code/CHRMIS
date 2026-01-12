@@ -1,297 +1,380 @@
 <?php
-require_once __DIR__ . '/../includes/db_config.php';
-session_start();
+// This partial now loads data from the API endpoint via AJAX.
+// Determine initial display month/year from GET or default to current.
+$displayMonth = isset($_GET['month']) && (int)$_GET['month'] > 0 ? (int)$_GET['month'] : (int)date('n');
+$displayYear  = isset($_GET['year']) && (int)$_GET['year'] > 0 ? (int)$_GET['year'] : (int)date('Y');
 
-try {
-    // Determine admin department(s)
-    $adminDept = null;
-    if (!empty($_SESSION['EmpID'])) {
-        $stmt = $pdo->prepare("SELECT Dept FROM adminusers WHERE EmpNo = ? LIMIT 1");
-        $stmt->execute([(string)$_SESSION['EmpID']]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row && !empty($row['Dept'])) {
-            $adminDept = $row['Dept'];
-        }
-    }
-
-    if ($adminDept === null) {
-        $stmt = $pdo->query("SELECT DISTINCT Dept FROM adminusers WHERE Dept IS NOT NULL AND TRIM(Dept) <> ''");
-        $adminDepts = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
-    } else {
-        $adminDepts = [$adminDept];
-    }
-
-    if (empty($adminDepts)) {
-        $statistics = null;
-    } else {
-        // Get employees in the department
-        $placeholders = implode(',', array_fill(0, count($adminDepts), '?'));
-        $sql = "SELECT 
-                    i.EmpNo,
-                    TRIM(CONCAT(
-                        i.Lname, ', ', i.Fname,
-                        IFNULL(CONCAT(' ', LEFT(i.Mname, 1), '.'), ''),
-                        CASE
-                            WHEN i.Extension IS NULL THEN ''
-                            WHEN LOWER(i.Extension) = 'n/a' THEN ''
-                            ELSE CONCAT(' ', i.Extension)
-                        END
-                    )) AS name
-                FROM i
-                WHERE i.Dept IN ($placeholders)
-                ORDER BY i.Lname, i.Fname";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($adminDepts);
-        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // Get leave statistics
-        $leaveStatistics = [];
-        if (!empty($employees)) {
-            $empNos = array_column($employees, 'EmpNo');
-            $p = implode(',', array_fill(0, count($empNos), '?'));
-
-            $sql = "SELECT 
-                        fl.EmpNo,
-                        fl.LeaveType,
-                        COUNT(*) as count,
-                        SUM(fl.NumDays) as totalDays
-                    FROM filedleave fl
-                    WHERE fl.Remarks = 'APPROVED'
-                    AND fl.EmpNo IN ($p)
-                    GROUP BY fl.EmpNo, fl.LeaveType";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($empNos);
-            $leaves = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            $leaveByEmp = [];
-            foreach ($leaves as $leave) {
-                $empNo = $leave['EmpNo'];
-                if (!isset($leaveByEmp[$empNo])) {
-                    $leaveByEmp[$empNo] = ['totalLeaves' => 0, 'totalDays' => 0];
-                }
-                $leaveByEmp[$empNo]['totalLeaves'] += $leave['count'];
-                $leaveByEmp[$empNo]['totalDays'] += $leave['totalDays'];
-            }
-
-            foreach ($employees as $emp) {
-                if (isset($leaveByEmp[$emp['EmpNo']])) {
-                    $leaveStatistics[] = [
-                        'empNo' => $emp['EmpNo'],
-                        'name' => $emp['name'],
-                        'totalLeaves' => $leaveByEmp[$emp['EmpNo']]['totalLeaves'],
-                        'totalDays' => $leaveByEmp[$emp['EmpNo']]['totalDays']
-                    ];
-                }
-            }
-
-            usort($leaveStatistics, function($a, $b) {
-                return $b['totalLeaves'] - $a['totalLeaves'];
-            });
-        }
-
-        // Get ETA and Locator statistics
-        $etaLocatorStatistics = [];
-        if (!empty($employees)) {
-            $empNos = array_column($employees, 'EmpNo');
-            $p = implode(',', array_fill(0, count($empNos), '?'));
-
-            $sql = "SELECT 
-                        EmpNo,
-                        application_type,
-                        COUNT(*) as count
-                    FROM eta_locator
-                    WHERE status = 'Approved'
-                    AND EmpNo IN ($p)
-                    GROUP BY EmpNo, application_type";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($empNos);
-            $etaLocators = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            $etaLocByEmp = [];
-            foreach ($etaLocators as $item) {
-                $empNo = $item['EmpNo'];
-                if (!isset($etaLocByEmp[$empNo])) {
-                    $etaLocByEmp[$empNo] = ['totalETA' => 0, 'totalLocator' => 0];
-                }
-                if ($item['application_type'] === 'ETA') {
-                    $etaLocByEmp[$empNo]['totalETA'] = $item['count'];
-                } else {
-                    $etaLocByEmp[$empNo]['totalLocator'] = $item['count'];
-                }
-            }
-
-            foreach ($employees as $emp) {
-                if (isset($etaLocByEmp[$emp['EmpNo']])) {
-                    $etaLocatorStatistics[] = [
-                        'empNo' => $emp['EmpNo'],
-                        'name' => $emp['name'],
-                        'totalETA' => $etaLocByEmp[$emp['EmpNo']]['totalETA'],
-                        'totalLocator' => $etaLocByEmp[$emp['EmpNo']]['totalLocator'],
-                        'total' => $etaLocByEmp[$emp['EmpNo']]['totalETA'] + $etaLocByEmp[$emp['EmpNo']]['totalLocator']
-                    ];
-                }
-            }
-
-            usort($etaLocatorStatistics, function($a, $b) {
-                return $b['total'] - $a['total'];
-            });
-        }
-
-        $statistics = [
-            'leaveStatistics' => $leaveStatistics,
-            'etaLocatorStatistics' => $etaLocatorStatistics
-        ];
-    }
-} catch (PDOException $e) {
-    $statistics = null;
-}
+// API path (root-relative to CHRMIS). Adjust if your app is mounted elsewhere.
+$apiUrl = '/CHRMIS/api/get_employee_statistics.php';
 ?>
 
-<div class="row">
-    <div class="col-md-12">
-        <ul class="nav nav-tabs" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link active" id="leave-tab" data-toggle="pill" href="#leaveStats" role="tab">Habitual Leave</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="eta-tab" data-toggle="pill" href="#etaStats" role="tab">ETA / Locator</a>
-            </li>
-        </ul>
-
-        <div class="tab-content mt-3">
-            <!-- Leave Statistics Tab -->
-            <div class="tab-pane fade show active" id="leaveStats" role="tabpanel">
-                <?php if ($statistics && !empty($statistics['leaveStatistics'])): ?>
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Employee Name</th>
-                                    <th class="text-center">Total Approved Leaves</th>
-                                    <th class="text-center">Total Days</th>
-                                    <th class="text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($statistics['leaveStatistics'] as $item): ?>
-                                    <?php 
-                                        $statusClass = '';
-                                        $statusLabel = '';
-                                        if ($item['totalLeaves'] >= 5) {
-                                            $statusClass = 'bg-danger';
-                                            $statusLabel = 'High Risk';
-                                        } elseif ($item['totalLeaves'] >= 3) {
-                                            $statusClass = 'bg-warning';
-                                            $statusLabel = 'Monitor';
-                                        } else {
-                                            $statusClass = 'bg-success';
-                                            $statusLabel = 'Normal';
-                                        }
-                                    ?>
-                                    <tr>
-                                        <td>
-                                            <strong><?php echo htmlspecialchars($item['name']); ?></strong><br>
-                                            <small class="text-muted"><?php echo htmlspecialchars($item['empNo']); ?></small>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge badge-primary"><?php echo $item['totalLeaves']; ?></span>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge badge-info"><?php echo $item['totalDays']; ?> days</span>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge <?php echo $statusClass; ?> text-white"><?php echo $statusLabel; ?></span>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> No leave statistics available.
-                    </div>
-                <?php endif; ?>
+<!-- Content Header -->
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Employee ETA / Locator Usage</h1>
             </div>
+        </div>
+    </div>
+</section>
+<style>
+/* Table design tweaks */
+.stats-table .text-truncate { max-width: 240px; }
+.usage-link { text-decoration: none; }
+.usage-link .badge { cursor: pointer; }
+.modal .table th, .modal .table td { vertical-align: middle; }
+</style>
+<script>
+const apiUrl = '<?= htmlspecialchars($apiUrl) ?>';
 
-            <!-- ETA/Locator Statistics Tab -->
-            <div class="tab-pane fade" id="etaStats" role="tabpanel">
-                <?php if ($statistics && !empty($statistics['etaLocatorStatistics'])): ?>
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Employee Name</th>
-                                    <th class="text-center">ETA Count</th>
-                                    <th class="text-center">Locator Count</th>
-                                    <th class="text-center">Total Trips</th>
-                                    <th class="text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($statistics['etaLocatorStatistics'] as $item): ?>
-                                    <?php 
-                                        $statusClass = '';
-                                        $statusLabel = '';
-                                        if ($item['total'] >= 10) {
-                                            $statusClass = 'bg-danger';
-                                            $statusLabel = 'Frequent';
-                                        } elseif ($item['total'] >= 5) {
-                                            $statusClass = 'bg-warning';
-                                            $statusLabel = 'Regular';
-                                        } else {
-                                            $statusClass = 'bg-success';
-                                            $statusLabel = 'Occasional';
-                                        }
-                                    ?>
-                                    <tr>
-                                        <td>
-                                            <strong><?php echo htmlspecialchars($item['name']); ?></strong><br>
-                                            <small class="text-muted"><?php echo htmlspecialchars($item['empNo']); ?></small>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge badge-success"><?php echo $item['totalETA']; ?></span>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge badge-info"><?php echo $item['totalLocator']; ?></span>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge badge-primary"><?php echo $item['total']; ?></span>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge <?php echo $statusClass; ?> text-white"><?php echo $statusLabel; ?></span>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> No ETA/Locator statistics available.
-                    </div>
-                <?php endif; ?>
+function formatBadge(count, type) {
+    let cls = 'secondary';
+    if (type === 'eta') cls = count > 0 ? 'info' : 'secondary';
+    if (type === 'locator') cls = count > 0 ? 'warning' : 'secondary';
+    if (type === 'total') cls = count >= 5 ? 'danger' : (count >= 3 ? 'warning' : 'success');
+    return `<span class="badge badge-${cls}">${count}</span>`;
+}
+
+// Format date string as "Jan 11, 2026"
+function formatDateStr(dateStr) {
+    if (!dateStr) return '';
+    try {
+        // normalize common MySQL datetime (space) to ISO parseable
+        let s = String(dateStr).trim();
+        if (s.indexOf(' ') !== -1 && s.indexOf('T') === -1 && s.indexOf('-') !== -1) {
+            s = s.replace(' ', 'T');
+        }
+        const d = new Date(s);
+        if (isNaN(d)) return dateStr;
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+// Format time string (HH:MM:SS or datetime) to 12-hour time like "6:15 PM"
+function formatTimeStr(timeStr) {
+    if (!timeStr) return '';
+    try {
+        let s = String(timeStr).trim();
+        // If it's a pure time like HH:MM or HH:MM:SS, prefix a date so Date() can parse it
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
+            s = '1970-01-01T' + s;
+        } else if (s.indexOf(' ') !== -1 && s.indexOf('T') === -1) {
+            s = s.replace(' ', 'T');
+        }
+        const d = new Date(s);
+        if (isNaN(d)) return timeStr;
+        return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch (e) {
+        return timeStr;
+    }
+}
+
+function renderRows(rows) {
+    const $body = $('#statsBody');
+    $body.empty();
+    if (!rows || rows.length === 0) {
+        $body.append(`<tr><td colspan="6" class="text-muted text-center">No ETA / Locator usage records found.</td></tr>`);
+        return;
+    }
+
+    rows.forEach(function(row){
+        const empNo = $('<div>').text(row.EmpNo || '').html();
+        const parts = [row.Lname || '', row.Fname || '', row.Mname || '', row.Extension || ''].filter(Boolean);
+        const name = $('<div>').text(parts.join(', ')).html();
+        const dept = $('<div>').text(row.Dept || '').html();
+        const eta = parseInt(row.eta_count) || 0;
+        const locator = parseInt(row.locator_count) || 0;
+        const total = parseInt(row.total_usage) || 0;
+
+        const currentMonth = window._stats_current_month || <?= (int)$displayMonth ?>;
+        const currentYear  = window._stats_current_year  || <?= (int)$displayYear ?>;
+
+        const etaBadge = `<a href="#" class="usage-link" data-emp="${empNo}" data-type="ETA" data-month="${currentMonth}" data-year="${currentYear}">${formatBadge(eta,'eta')}</a>`;
+        const locatorBadge = `<a href="#" class="usage-link" data-emp="${empNo}" data-type="Locator" data-month="${currentMonth}" data-year="${currentYear}">${formatBadge(locator,'locator')}</a>`;
+
+        const tr = `
+            <tr>
+                <td class="align-middle">${empNo}</td>
+                <td class="text-truncate" style="max-width:240px;">${name}</td>
+                <td class="align-middle">${dept}</td>
+                <td class="text-center align-middle">${etaBadge}</td>
+                <td class="text-center align-middle">${locatorBadge}</td>
+                <td class="text-center align-middle">${formatBadge(total,'total')}</td>
+            </tr>
+        `;
+        $body.append(tr);
+    });
+}
+
+function fetchStats(month, year) {
+    const $table = $('.card-body.table-responsive');
+    const $tbody = $('#statsBody');
+    $tbody.html(`<tr><td colspan="6" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>`);
+
+    $.getJSON(apiUrl, { month: month, year: year })
+        .done(function(resp){
+            if (resp && resp.success) {
+                // store current month/year for modal links
+                window._stats_current_month = month;
+                window._stats_current_year = year;
+                renderRows(resp.data);
+            } else {
+                $tbody.html(`<tr><td colspan="6" class="text-danger text-center">Failed to load data.</td></tr>`);
+            }
+        })
+        .fail(function(){
+            $tbody.html(`<tr><td colspan="6" class="text-danger text-center">Failed to load data.</td></tr>`);
+        });
+}
+
+$(document).on('click', '.month-nav', function(e){
+    e.preventDefault();
+    const month = $(this).data('month');
+    const year  = $(this).data('year');
+    // update label
+    const $container = $(this).closest('.d-flex');
+    const label = $container.find('.font-weight-bold');
+    const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long' });
+    label.text(monthName + ' ' + year);
+    // update prev/next buttons to be relative to the new current month
+    updateNavButtons($container, month, year);
+    fetchStats(month, year);
+});
+
+$(document).on('click', '#monthToday', function(e){
+    e.preventDefault();
+    const month = $(this).data('month');
+    const year  = $(this).data('year');
+    const $container = $(this).closest('.d-flex');
+    const label = $container.find('.font-weight-bold');
+    const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long' });
+    label.text(monthName + ' ' + year);
+    updateNavButtons($container, month, year);
+    fetchStats(month, year);
+});
+
+// initial load
+$(function(){
+    const $container = $('.d-flex.justify-content-between').first();
+    // ensure nav buttons match initial display
+    updateNavButtons($container, <?= (int)$displayMonth ?>, <?= (int)$displayYear ?>);
+    fetchStats(<?= (int)$displayMonth ?>, <?= (int)$displayYear ?>);
+});
+
+// Update prev/next button data attributes for a container given current month/year
+function updateNavButtons($container, month, year) {
+    if (!$container || $container.length === 0) return;
+    const prevBtn = $container.find('.month-nav').first();
+    const nextBtn = $container.find('.month-nav').last();
+
+    const cur = new Date(year, month - 1, 1);
+    const prev = new Date(cur); prev.setMonth(cur.getMonth() - 1);
+    const next = new Date(cur); next.setMonth(cur.getMonth() + 1);
+
+    const pMonth = prev.getMonth() + 1, pYear = prev.getFullYear();
+    const nMonth = next.getMonth() + 1, nYear = next.getFullYear();
+
+    prevBtn.data('month', pMonth).data('year', pYear).attr('data-month', pMonth).attr('data-year', pYear);
+    nextBtn.data('month', nMonth).data('year', nYear).attr('data-month', nMonth).attr('data-year', nYear);
+}
+</script>
+
+<!-- Modals for ETA and Locator details -->
+<!-- ETA Usage Modal -->
+<div class="modal fade" id="etaUsageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title">ETA Usage Details</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Travel Date</th>
+                                <th>Business Type</th>
+                                <th>Destination</th>
+                                <th>Travel Detail</th>
+                            </tr>
+                        </thead>
+                        <tbody id="etaModalBody">
+                            <tr><td colspan="4" class="text-center text-muted">No records.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-    .nav-tabs .nav-link {
-        color: #495057;
-        border: 1px solid #dee2e6;
-        margin-right: 5px;
-    }
-    .nav-tabs .nav-link.active {
-        background-color: #007bff;
-        color: white;
-    }
-    .nav-tabs .nav-link:hover {
-        border-color: #dee2e6;
-        color: #007bff;
-    }
-    .badge {
-        padding: 8px 12px;
-        font-size: 12px;
-    }
-</style>
+<!-- Locator Usage Modal -->
+<div class="modal fade" id="locatorUsageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title">Locator Usage Details</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover table-striped table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Travel Date</th>
+                                        <th>Intended Departure</th>
+                                        <th>Intended Arrival</th>
+                                        <th>Destination</th>
+                                        <th>Business Type</th>
+                                        <th>Travel Detail</th>
+                                        <th>Arrival Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="locatorModalBody">
+                                    <tr><td colspan="7" class="text-center text-muted">No records.</td></tr>
+                                </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle clicks on usage badges (delegated)
+$(document).on('click', '.usage-link', function(e){
+        e.preventDefault();
+        const empNo = $(this).data('emp');
+        const type = $(this).data('type');
+        // prefer data-month/year on element, fallback to global
+        const month = $(this).data('month') || window._stats_current_month || <?= (int)$displayMonth ?>;
+        const year  = $(this).data('year')  || window._stats_current_year  || <?= (int)$displayYear ?>;
+
+        const url = '/CHRMIS/api/get_employee_usage_details.php';
+        $.getJSON(url, { empNo: empNo, type: type, month: month, year: year })
+                .done(function(resp){
+                        if (!resp || !resp.success) {
+                                alert('Failed to load details');
+                                return;
+                        }
+
+                        if (type === 'ETA') {
+                            const $b = $('#etaModalBody');
+                            $b.empty();
+                            if (resp.data.length === 0) {
+                                $b.append('<tr><td colspan="4" class="text-center text-muted">No records for selected month.</td></tr>');
+                            } else {
+                                resp.data.forEach(function(r){
+                                    const travelDate = formatDateStr(r.travel_date);
+                                    const business = $('<div>').text(r.business_type || '').html();
+                                    const destination = $('<div>').text(r.destination || '').html();
+                                    const detail = $('<div>').text(r.travel_detail || '').html();
+                                    $b.append(`<tr>
+                                        <td>${travelDate}</td>
+                                        <td>${business}</td>
+                                        <td>${destination}</td>
+                                        <td>${detail}</td>
+                                    </tr>`);
+                                });
+                            }
+                            $('#etaUsageModal').modal('show');
+                        } else {
+                            const $b = $('#locatorModalBody');
+                            $b.empty();
+                            if (resp.data.length === 0) {
+                                $b.append('<tr><td colspan="7" class="text-center text-muted">No records for selected month.</td></tr>');
+                            } else {
+                                resp.data.forEach(function(r){
+                                    const travelDate = formatDateStr(r.travel_date);
+                                    const intendedDeparture = formatTimeStr(r.intended_departure);
+                                    const intendedArrival = formatTimeStr(r.intended_arrival);
+                                    const destination = $('<div>').text(r.destination || '').html();
+                                    const business = $('<div>').text(r.business_type || '').html();
+                                    const detail = $('<div>').text(r.travel_detail || '').html();
+                                    const arrivalTime = formatTimeStr(r.Arrival_Time) || formatTimeStr(r.arrival_date);
+                                    $b.append(`<tr>
+                                        <td>${travelDate}</td>
+                                        <td>${intendedDeparture}</td>
+                                        <td>${intendedArrival}</td>
+                                        <td>${destination}</td>
+                                        <td>${business}</td>
+                                        <td>${detail}</td>
+                                        <td>${arrivalTime}</td>
+                                    </tr>`);
+                                });
+                            }
+                            $('#locatorUsageModal').modal('show');
+                        }
+                })
+                .fail(function(){
+                        alert('Failed to load details');
+                });
+});
+</script>
+
+<!-- Main content -->
+<section class="content">
+    <div class="container-fluid">
+
+        <div class="card card-primary card-outline">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-bar mr-1"></i>
+                    Usage Statistics
+                </h3>
+            </div>
+
+            <div class="card-body table-responsive">
+                <?php
+                    // Previous / next month helper (use displayMonth/displayYear set at top)
+                    $prev = (new DateTime())->setDate($displayYear, $displayMonth, 1)->modify('-1 month');
+                    $next = (new DateTime())->setDate($displayYear, $displayMonth, 1)->modify('+1 month');
+                ?>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary month-nav" data-month="<?= $prev->format('n') ?>" data-year="<?= $prev->format('Y') ?>">&laquo; Prev</button>
+                        <span class="mx-2 font-weight-bold"><?= htmlspecialchars(date('F', mktime(0,0,0,$displayMonth,1,$displayYear))) . ' ' . $displayYear ?></span>
+                        <button class="btn btn-sm btn-outline-primary month-nav" data-month="<?= $next->format('n') ?>" data-year="<?= $next->format('Y') ?>">Next &raquo;</button>
+                    </div>
+                    <div>
+                        <a href="#" class="btn btn-sm btn-secondary" id="monthToday" data-month="<?= date('n') ?>" data-year="<?= date('Y') ?>">This Month</a>
+                    </div>
+                </div>
+                <table class="table table-bordered table-hover table-striped table-sm stats-table text-nowrap align-middle">
+                    <thead class="thead-light">
+                        <tr>
+                            <th style="width:12%">Employee Number</th>
+                            <th style="width:36%">Employee Name</th>
+                            <th style="width:18%">Department</th>
+                            <th class="text-center" style="width:10%">ETA Usage</th>
+                            <th class="text-center" style="width:12%">Locator Usage</th>
+                            <th class="text-center" style="width:12%">Total Usage</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statsBody">
+                        <tr>
+                            <td colspan="6" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card-footer text-muted">
+                Showing ETA and Locator usage based on approved applications
+            </div>
+        </div>
+
+    </div>
+</section>
+
