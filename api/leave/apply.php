@@ -31,9 +31,28 @@ if (!$df || !$dt) {
     exit;
 }
 
-if ($df < $today) {
+
+$map = [
+    'Vacation' => 'VL',
+    'Sick' => 'SL',
+    'Maternity' => 'ML',
+    'Paternity' => 'PL',
+    'Adoption' => 'AD',
+    'Solo Parent' => 'SPL',
+    'VAWC' => 'VAWC',
+    'Gynecological' => 'GY',
+    'Emergency' => 'EM',
+    'Special Privilege' => 'SPP',
+    'Study' => 'ST',
+    'LWOP' => 'LWOP'
+];
+
+$leaveCode = $map[$leaveType] ?? strtoupper(substr(preg_replace('/\s+/', '', $leaveType), 0, 3));
+
+// Only apply 'Date From cannot be in the past' for Vacation Leave (VL)
+if ($leaveCode === 'VL' && $df < $today) {
     http_response_code(400);
-    echo json_encode(['error' => 'Date From cannot be in the past.']);
+    echo json_encode(['error' => 'Date From cannot be in the past for Vacation Leave.']);
     exit;
 }
 
@@ -91,10 +110,17 @@ if ($leaveCode === 'VL' && $totalDays > $vacSnap) {
     echo json_encode(['error' => 'Vacation leave days requested exceed available VL credits.']);
     exit;
 }
+// For Sick Leave, if not enough SL credits, allow if VL credits are available, and mark for VL deduction
+$deductFromVL = false;
 if ($leaveCode === 'SL' && $totalDays > $sickSnap) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Sick leave days requested exceed available SL credits.']);
-    exit;
+    if ($totalDays <= $vacSnap) {
+        // Allow application, but mark for VL deduction
+        $deductFromVL = true;
+    } else {
+        http_response_code(400);
+        echo json_encode(['error' => 'Sick leave days requested exceed available SL credits and fallback VL credits.']);
+        exit;
+    }
 }
 
 // Save uploaded document if present
@@ -135,7 +161,20 @@ try {
 }
 
 // Create leave record
-$leaveId = $repo->createLeave(currentUserId(), $leaveType, $leaveCode, $dateFrom, $dateTo, (float)$totalDays, '', $reason ?: '', $documentFilename, $empInfo, $vacSnap, $sickSnap);
+$leaveId = $repo->createLeave(
+    currentUserId(),
+    $leaveType,
+    $leaveCode,
+    $dateFrom,
+    $dateTo,
+    (float)$totalDays,
+    $deductFromVL ? 'VL' : '', // use this field to indicate deduction from VL if needed
+    $reason ?: '',
+    $documentFilename,
+    $empInfo,
+    $vacSnap,
+    $sickSnap
+);
 
 if ($leaveId === false) {
     // Attempt to fetch recent server log lines for quick debugging if available (non-sensitive, local dev)

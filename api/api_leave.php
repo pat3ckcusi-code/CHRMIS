@@ -184,18 +184,24 @@ switch($method) {
         $dateFrom = $leaveData['DateFrom'];
         $dateTo = $leaveData['DateTo'];
         $column = isset($leaveTypeMap[$leaveTypeName]) ? $leaveTypeMap[$leaveTypeName] : null;
+        // Check if this SL application was marked for VL deduction (see apply.php logic)
+        $deductFromVL = false;
+        if ($leaveTypeName === 'Sick' && isset($leaveData['Purpose']) && $leaveData['Purpose'] === 'VL') {
+          $column = 'VL';
+          $deductFromVL = true;
+        }
         if ($column) {
-            // Calculate number of days (inclusive)
-            $days = 1;
-            if ($dateFrom && $dateTo) {
-                $start = new DateTime($dateFrom);
-                $end = new DateTime($dateTo);
-                $days = $start->diff($end)->days + 1;
-            }
-            // Deduct from leavecredits
-            $sqlDeduct = "UPDATE leavecredits SET $column = GREATEST($column - ?, 0) WHERE EmpNo = ?";
-            $stmtDeduct = $pdo->prepare($sqlDeduct);
-            $stmtDeduct->execute([$days, $empNo]);
+          // Calculate number of days (inclusive)
+          $days = 1;
+          if ($dateFrom && $dateTo) {
+            $start = new DateTime($dateFrom);
+            $end = new DateTime($dateTo);
+            $days = $start->diff($end)->days + 1;
+          }
+          // Deduct from leavecredits (VL if fallback, else normal)
+          $sqlDeduct = "UPDATE leavecredits SET $column = GREATEST($column - ?, 0) WHERE EmpNo = ?";
+          $stmtDeduct = $pdo->prepare($sqlDeduct);
+          $stmtDeduct->execute([$days, $empNo]);
         }
         
         // Send approval email
@@ -247,7 +253,7 @@ switch($method) {
           exit;
         }
 
-        // ✅ Update status AND rejection note (parameterized)
+        // Update status AND rejection note (parameterized)
         $sqlUpdate = "
           UPDATE filedleave
           SET Status = 'Disapproved',
