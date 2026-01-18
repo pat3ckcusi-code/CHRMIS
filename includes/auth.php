@@ -1,12 +1,24 @@
 <?php
-session_start();
+// session_start();
+
+// if (!isset($_SESSION['EmpID'])) {
+//     http_response_code(401);
+//     echo json_encode(['error' => 'Unauthorized']);
+//     exit;
+// }
+
+// function currentUserId() {
+//     return $_SESSION['EmpID'];
+// }
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if (!isset($_SESSION['EmpID'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
+    throw new RuntimeException('Unauthorized');
 }
 
-function currentUserId() {
-    return $_SESSION['EmpID'];
+function currentUserId(): string {
+    return (string)$_SESSION['EmpID'];
 }
+

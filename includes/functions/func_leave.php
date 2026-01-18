@@ -170,5 +170,15 @@ function get_all_leavecredits($pdo, $dept = null) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function getLeaveBalance(PDO $pdo, string $empNo): ?array
+{
+    $sql = "SELECT VL, SL, CL, SPL, CTO
+            FROM leavecredits
+            WHERE EmpNo = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$empNo]);
+
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
 
 ?>

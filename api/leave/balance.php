@@ -8,7 +8,7 @@ require_once '../../controllers/LeaveController.php';
 header('Content-Type: application/json');
 
 $controller = new LeaveController(
-    new LeaveService(new LeaveRepository($pdo))
+    new LeaveService(new LeaveRepository($pdo), $pdo)
 );
 
 echo json_encode($controller->balance(currentUserId()));

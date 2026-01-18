@@ -15,3 +15,10 @@ class LeaveController {
         return $this->service->cancelLeave($leaveId, $empNo);
     }
 }
+try {
+    require_once '../../includes/auth.php';
+} catch (Throwable $e) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}

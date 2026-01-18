@@ -76,7 +76,7 @@ canvas {
 
 <!-- JS -->
 <script>
-// ==================== Employees per Department ====================
+// Employees per Department 
 async function loadDeptChart(){
   try{
     const res = await fetch("../api/workforce_data.php");
@@ -138,7 +138,7 @@ async function loadDeptChart(){
 }
 
 
-// ==================== Show Employees in popup ====================
+//Show Employees in popup 
 async function showDeptEmployees(dept) {
   try {
     const res = await fetch(`../api/get_department_employees.php?dept=${encodeURIComponent(dept)}`);
@@ -149,14 +149,14 @@ async function showDeptEmployees(dept) {
       return;
     }
 
-    // ---------- STATE ----------
+    //STATE
     let filtered = [...employees];
     let currentPage = 1;
     const rowsPerPage = 10;
     let sortColumn = null;
     let sortAsc = true;
 
-    // ---------- HELPERS ----------
+    // HELPERS 
     const colKeys = ["EmpNo", "FullName", "Position", "Gender", "Age", "EmploymentStatus", "date_hired"];
 
     function renderRows() {
@@ -322,7 +322,7 @@ async function showDeptEmployees(dept) {
 
 
 
-// ==================== Main Dashboard Charts ====================
+// Main Dashboard Charts
 function initializeCharts(dept=''){
   const ctxGender = document.getElementById('genderChart').getContext('2d');
   const ctxStatus = document.getElementById('statusChart').getContext('2d');
@@ -347,11 +347,405 @@ function initializeCharts(dept=''){
 
       charts.gender=new Chart(ctxGender,{type:'doughnut',data:{labels:data.gender.map(g=>g.Gender||'Unknown'),datasets:[{data:data.gender.map(g=>g.total),backgroundColor:['#36A2EB','#FF6384']}]},options:commonOptions});
       charts.status=new Chart(ctxStatus,{type:'pie',data:{labels:data.status.map(s=>s.EmploymentStatus||'Unknown'),datasets:[{data:data.status.map(s=>s.total),backgroundColor:['#FFCE56','#4BC0C0','#9966FF','#FF9F40','#FF6384']}]},options:commonOptions});
-      charts.age=new Chart(ctxAge,{type:'bar',data:{labels:data.age.map(a=>a.AgeGroup),datasets:[{label:'Employees',data:data.age.map(a=>a.total),backgroundColor:'#FF9F40'}]},options:{...commonOptions,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
-      charts.tenure=new Chart(ctxTenure,{type:'bar',data:{labels:data.tenure.map(t=>t.ServiceLength),datasets:[{label:'Employees',data:data.tenure.map(t=>t.total),backgroundColor:'#2600ffff'}]},options:{...commonOptions,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+      charts.age=new Chart(ctxAge,{
+        type:'bar',
+        data:{
+          labels:data.age.map(a=>a.AgeGroup),
+          datasets:[{label:'Employees',data:data.age.map(a=>a.total),backgroundColor:'#FF9F40'}]
+        },
+        options:{
+          ...commonOptions,
+          scales:{y:{beginAtZero:true,ticks:{precision:0}}},
+          onClick: async function(e, elements) {
+            // Chart.js v3+ passes elements as 2nd arg
+            let points = elements && elements.length ? elements : this.getElementsAtEventForMode(e, 'nearest', {intersect:true}, true);
+            if(points.length){
+              const index = points[0].index;
+              const selectedAgeGroup = data.age[index].AgeGroup;
+              await showAgeGroupEmployees(selectedAgeGroup, dept);
+            }
+          }
+        }
+      });
+      charts.tenure=new Chart(ctxTenure,{
+        type:'bar',
+        data:{
+          labels:data.tenure.map(t=>t.ServiceLength),
+          datasets:[{label:'Employees',data:data.tenure.map(t=>t.total),backgroundColor:'#2600ffff'}]
+        },
+        options:{
+          ...commonOptions,
+          scales:{y:{beginAtZero:true,ticks:{precision:0}}},
+          onClick: async function(e, elements) {
+            let points = elements && elements.length ? elements : this.getElementsAtEventForMode(e, 'nearest', {intersect:true}, true);
+            if(points.length){
+              const index = points[0].index;
+              const selectedService = data.tenure[index].ServiceLength;
+              await showTenureEmployees(selectedService, dept);
+            }
+          }
+        }
+      });
+// Show employees in selected length of service group in a modal
+async function showTenureEmployees(serviceLength, dept='') {
+  try {
+    // Fetch all employees for the department (or all)
+    const res = await fetch(`../api/get_department_employees.php?dept=${encodeURIComponent(dept)}`);
+    const employees = await res.json();
+    // Filter by length of service
+    let filtered = employees.filter(emp => {
+      const hired = new Date(emp.date_hired);
+      const today = new Date();
+      const years = today.getFullYear() - hired.getFullYear() - (today < new Date(today.getFullYear(), hired.getMonth(), hired.getDate()) ? 1 : 0);
+      if (serviceLength === '<1 yr') return years < 1;
+      if (serviceLength === '1-4 yrs') return years >= 1 && years <= 4;
+      if (serviceLength === '5-9 yrs') return years >= 5 && years <= 9;
+      if (serviceLength === '10-14 yrs') return years >= 10 && years <= 14;
+      if (serviceLength === '15-19 yrs') return years >= 15 && years <= 19;
+      if (serviceLength === '20+ yrs') return years >= 20;
+      return false;
+    });
+
+    if (!filtered.length) {
+      Swal.fire("Info", `No employees found for length of service ${serviceLength}` , "info");
+      return;
+    }
+
+    // Modal state and helpers (search, sort, pagination)
+    let currentPage = 1;
+    const rowsPerPage = 10;
+    let sortColumn = null;
+    let sortAsc = true;
+    let searchKeyword = '';
+    const colKeys = ["EmpNo", "FullName", "Position", "Dept", "Gender", "Age", "EmploymentStatus", "date_hired"];
+
+    function renderRows() {
+      const start = (currentPage - 1) * rowsPerPage;
+      const pageData = filtered.slice(start, start + rowsPerPage);
+      return pageData.map(emp => `
+        <tr>
+          <td>${emp.EmpNo}</td>
+          <td>${emp.FullName}</td>
+          <td>${emp.Position ?? ''}</td>
+          <td>${emp.Dept ?? ''}</td>
+          <td>${emp.Gender}</td>
+          <td>${emp.Age}</td>
+          <td>${emp.EmploymentStatus}</td>
+          <td>${emp.date_hired}</td>
+        </tr>
+      `).join("");
+    }
+
+    function applySort(colIndex) {
+      const key = colKeys[colIndex];
+      if (sortColumn === colIndex) sortAsc = !sortAsc;
+      else {
+        sortColumn = colIndex;
+        sortAsc = true;
+      }
+      filtered.sort((a, b) => {
+        const valA = (a[key] ?? "").toString().toLowerCase();
+        const valB = (b[key] ?? "").toString().toLowerCase();
+        if (key === "Age" || key === "EmpNo") {
+          return sortAsc
+            ? (parseInt(valA) || 0) - (parseInt(valB) || 0)
+            : (parseInt(valB) || 0) - (parseInt(valA) || 0);
+        }
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      });
+      currentPage = 1;
+      updateTable();
+    }
+
+    function applySearch(keyword) {
+      searchKeyword = keyword.toLowerCase();
+      filtered = employees.filter(emp =>
+        Object.values(emp).some(v =>
+          String(v).toLowerCase().includes(searchKeyword)
+        ) && (function() {
+          const hired = new Date(emp.date_hired);
+          const today = new Date();
+          const years = today.getFullYear() - hired.getFullYear() - (today < new Date(today.getFullYear(), hired.getMonth(), hired.getDate()) ? 1 : 0);
+          if (serviceLength === '<1 yr') return years < 1;
+          if (serviceLength === '1-4 yrs') return years >= 1 && years <= 4;
+          if (serviceLength === '5-9 yrs') return years >= 5 && years <= 9;
+          if (serviceLength === '10-14 yrs') return years >= 10 && years <= 14;
+          if (serviceLength === '15-19 yrs') return years >= 15 && years <= 19;
+          if (serviceLength === '20+ yrs') return years >= 20;
+          return false;
+        })()
+      );
+      currentPage = 1;
+      updateTable();
+    }
+
+    function updateTable() {
+      document.getElementById("tenureEmpTableBody").innerHTML = renderRows();
+      document.getElementById("tenurePageIndicator").innerText =
+        `Page ${currentPage} of ${Math.ceil(filtered.length / rowsPerPage)}`;
+    }
+
+    Swal.fire({
+      title: `Employees with Length of Service: ${serviceLength}`,
+      width: "1300px",
+      html: `
+        <style>
+          .emp-table-container { max-height: 700px; overflow: auto; }
+          .emp-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+          .emp-table thead th {
+            position: sticky; top: 0; background: #f1f1f1;
+            cursor: pointer; padding: 8px; border-bottom: 2px solid #ccc;
+            white-space: nowrap;
+          }
+          .emp-table tbody td {
+            padding: 6px 8px; border-bottom: 1px solid #e1e1e1;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          }
+          .emp-table th:nth-child(1), .emp-table td:nth-child(1) { width: 80px; }
+          .emp-table th:nth-child(2), .emp-table td:nth-child(2) { width: 240px; }
+          .emp-table th:nth-child(3), .emp-table td:nth-child(3) { width: 180px; }
+          .emp-table th:nth-child(4), .emp-table td:nth-child(4) { width: 200px; }
+          .emp-table th:nth-child(5), .emp-table td:nth-child(5) { width: 60px; text-align:center; }
+          .emp-table th:nth-child(6), .emp-table td:nth-child(6) { width: 50px; text-align:center; }
+          .emp-table th:nth-child(7), .emp-table td:nth-child(7) { width: 120px; }
+          .emp-table th:nth-child(8), .emp-table td:nth-child(8) { width: 120px; }
+        </style>
+
+        <input id="tenureSearchBox" type="text" class="form-control mb-2" placeholder="Search..." />
+
+        <div class="emp-table-container">
+          <table class="emp-table">
+            <thead>
+              <tr>
+                <th data-col="0">EmpNo</th>
+                <th data-col="1">Name</th>
+                <th data-col="2">Position</th>
+                <th data-col="3">Department</th>
+                <th data-col="4">Gender</th>
+                <th data-col="5">Age</th>
+                <th data-col="6">Status</th>
+                <th data-col="7">Date Hired</th>
+              </tr>
+            </thead>
+            <tbody id="tenureEmpTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between mt-2">
+          <button id="tenurePrevBtn" class="btn btn-sm btn-secondary">Prev</button>
+          <span id="tenurePageIndicator"></span>
+          <button id="tenureNextBtn" class="btn btn-sm btn-secondary">Next</button>
+        </div>
+      `,
+      didOpen: () => {
+        document.getElementById("tenureSearchBox").addEventListener("input", e =>
+          applySearch(e.target.value)
+        );
+        document.querySelectorAll(".emp-table thead th").forEach(th => {
+          th.addEventListener("click", () =>
+            applySort(parseInt(th.dataset.col))
+          );
+        });
+        document.getElementById("tenurePrevBtn").onclick = () => {
+          if (currentPage > 1) {
+            currentPage--;
+            updateTable();
+          }
+        };
+        document.getElementById("tenureNextBtn").onclick = () => {
+          if (currentPage < Math.ceil(filtered.length / rowsPerPage)) {
+            currentPage++;
+            updateTable();
+          }
+        };
+        updateTable();
+      },
+      confirmButtonText: "Close"
+    });
+  } catch (err) {
+    console.error(err);
+    Swal.fire("Error", "Failed to load employee list for length of service", "error");
+  }
+}
 
       $(".charts-row").fadeTo(300,1);
     })
     .catch(err=>console.error("Fetch error:",err));
+}
+
+// Show employees in selected age group in a modal
+async function showAgeGroupEmployees(ageGroup, dept='') {
+  try {
+    // Fetch all employees for the department (or all)
+    const res = await fetch(`../api/get_department_employees.php?dept=${encodeURIComponent(dept)}`);
+    const employees = await res.json();
+    // Filter by age group
+    let filtered = employees.filter(emp => {
+      const age = parseInt(emp.Age);
+      if (ageGroup === '<30') return age < 30;
+      if (ageGroup === '30-39') return age >= 30 && age <= 39;
+      if (ageGroup === '40-49') return age >= 40 && age <= 49;
+      if (ageGroup === '50-59') return age >= 50 && age <= 59;
+      if (ageGroup === '60+') return age >= 60;
+      return false;
+    });
+
+    if (!filtered.length) {
+      Swal.fire("Info", `No employees found for age group ${ageGroup}` , "info");
+      return;
+    }
+
+    // Modal state and helpers (search, sort, pagination)
+    let currentPage = 1;
+    const rowsPerPage = 10;
+    let sortColumn = null;
+    let sortAsc = true;
+    let searchKeyword = '';
+    const colKeys = ["EmpNo", "FullName", "Position", "Dept", "Gender", "Age", "EmploymentStatus", "date_hired"];
+
+    function renderRows() {
+      const start = (currentPage - 1) * rowsPerPage;
+      const pageData = filtered.slice(start, start + rowsPerPage);
+      return pageData.map(emp => `
+        <tr>
+          <td>${emp.EmpNo}</td>
+          <td>${emp.FullName}</td>
+          <td>${emp.Position ?? ''}</td>
+          <td>${emp.Dept ?? ''}</td>
+          <td>${emp.Gender}</td>
+          <td>${emp.Age}</td>
+          <td>${emp.EmploymentStatus}</td>
+          <td>${emp.date_hired}</td>
+        </tr>
+      `).join("");
+    }
+
+    function applySort(colIndex) {
+      const key = colKeys[colIndex];
+      if (sortColumn === colIndex) sortAsc = !sortAsc;
+      else {
+        sortColumn = colIndex;
+        sortAsc = true;
+      }
+      filtered.sort((a, b) => {
+        const valA = (a[key] ?? "").toString().toLowerCase();
+        const valB = (b[key] ?? "").toString().toLowerCase();
+        if (key === "Age" || key === "EmpNo") {
+          return sortAsc
+            ? (parseInt(valA) || 0) - (parseInt(valB) || 0)
+            : (parseInt(valB) || 0) - (parseInt(valA) || 0);
+        }
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      });
+      currentPage = 1;
+      updateTable();
+    }
+
+    function applySearch(keyword) {
+      searchKeyword = keyword.toLowerCase();
+      filtered = employees.filter(emp =>
+        Object.values(emp).some(v =>
+          String(v).toLowerCase().includes(searchKeyword)
+        ) && (function() {
+          const age = parseInt(emp.Age);
+          if (ageGroup === '<30') return age < 30;
+          if (ageGroup === '30-39') return age >= 30 && age <= 39;
+          if (ageGroup === '40-49') return age >= 40 && age <= 49;
+          if (ageGroup === '50-59') return age >= 50 && age <= 59;
+          if (ageGroup === '60+') return age >= 60;
+          return false;
+        })()
+      );
+      currentPage = 1;
+      updateTable();
+    }
+
+    function updateTable() {
+      document.getElementById("ageEmpTableBody").innerHTML = renderRows();
+      document.getElementById("agePageIndicator").innerText =
+        `Page ${currentPage} of ${Math.ceil(filtered.length / rowsPerPage)}`;
+    }
+
+    Swal.fire({
+      title: `Employees in Age Group: ${ageGroup}`,
+      width: "1300px",
+      html: `
+        <style>
+          .emp-table-container { max-height: 700px; overflow: auto; }
+          .emp-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+          .emp-table thead th {
+            position: sticky; top: 0; background: #f1f1f1;
+            cursor: pointer; padding: 8px; border-bottom: 2px solid #ccc;
+            white-space: nowrap;
+          }
+          .emp-table tbody td {
+            padding: 6px 8px; border-bottom: 1px solid #e1e1e1;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          }
+          .emp-table th:nth-child(1), .emp-table td:nth-child(1) { width: 80px; }
+          .emp-table th:nth-child(2), .emp-table td:nth-child(2) { width: 240px; }
+          .emp-table th:nth-child(3), .emp-table td:nth-child(3) { width: 180px; }
+          .emp-table th:nth-child(4), .emp-table td:nth-child(4) { width: 200px; }
+          .emp-table th:nth-child(5), .emp-table td:nth-child(5) { width: 60px; text-align:center; }
+          .emp-table th:nth-child(6), .emp-table td:nth-child(6) { width: 50px; text-align:center; }
+          .emp-table th:nth-child(7), .emp-table td:nth-child(7) { width: 120px; }
+          .emp-table th:nth-child(8), .emp-table td:nth-child(8) { width: 120px; }
+        </style>
+
+        <input id="ageSearchBox" type="text" class="form-control mb-2" placeholder="Search..." />
+
+        <div class="emp-table-container">
+          <table class="emp-table">
+            <thead>
+              <tr>
+                <th data-col="0">EmpNo</th>
+                <th data-col="1">Name</th>
+                <th data-col="2">Position</th>
+                <th data-col="3">Department</th>
+                <th data-col="4">Gender</th>
+                <th data-col="5">Age</th>
+                <th data-col="6">Status</th>
+                <th data-col="7">Date Hired</th>
+              </tr>
+            </thead>
+            <tbody id="ageEmpTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between mt-2">
+          <button id="agePrevBtn" class="btn btn-sm btn-secondary">Prev</button>
+          <span id="agePageIndicator"></span>
+          <button id="ageNextBtn" class="btn btn-sm btn-secondary">Next</button>
+        </div>
+      `,
+      didOpen: () => {
+        document.getElementById("ageSearchBox").addEventListener("input", e =>
+          applySearch(e.target.value)
+        );
+        document.querySelectorAll(".emp-table thead th").forEach(th => {
+          th.addEventListener("click", () =>
+            applySort(parseInt(th.dataset.col))
+          );
+        });
+        document.getElementById("agePrevBtn").onclick = () => {
+          if (currentPage > 1) {
+            currentPage--;
+            updateTable();
+          }
+        };
+        document.getElementById("ageNextBtn").onclick = () => {
+          if (currentPage < Math.ceil(filtered.length / rowsPerPage)) {
+            currentPage++;
+            updateTable();
+          }
+        };
+        updateTable();
+      },
+      confirmButtonText: "Close"
+    });
+  } catch (err) {
+    console.error(err);
+    Swal.fire("Error", "Failed to load employee list for age group", "error");
+  }
 }
 </script>

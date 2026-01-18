@@ -1,5 +1,0 @@
-[createLeave][exception] There is no active transaction | emp=24018 | from=2026-01-05 | to=2026-01-05 | totalDays=1 | ref=24018-20251229-2647
-#0 C:\xampp\htdocs\CHRMIS\repositories\LeaveRepository.php(210): PDO->commit()
-#1 C:\xampp\htdocs\CHRMIS\api\leave\apply.php(126): LeaveRepository->createLeave('24018', 'Vacation', 'VL', '2026-01-05', '2026-01-05', 1.0, '', 'Vacations', NULL, Array, 22.5, 2.5)
-#2 {main}
-----

@@ -46,6 +46,7 @@ function verify_login_admin($pdo, $username, $password) {
                     'EmpNo'   => $user["EmpNo"],
                     'UserName'=> $user["UserName"],
                     'username'=> $user["UserName"],
+                    'access_level' => $user["access_level"],
                     'isDefaultPassword' => $isDefault,
                     'userType' => 'adminusers'
                 ];

@@ -16,7 +16,7 @@ if (!$leaveId) {
 }
 
 $controller = new LeaveController(
-    new LeaveService(new LeaveRepository($pdo))
+    new LeaveService(new LeaveRepository($pdo), $pdo)
 );
 
 $success = $controller->cancel($leaveId, currentUserId());

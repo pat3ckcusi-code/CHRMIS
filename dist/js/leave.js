@@ -5,12 +5,28 @@ $(document).ready(function () {
 
   function loadBalances() {
     $.getJSON('/CHRMIS/api/leave/balance.php', function (data) {
-      $('#vacation').text(data.vacation + ' Days');
-      $('#sick').text(data.sick + ' Days');
-      $('#cto').text(data.cto + ' Days');
-      $('#special').text(data.special + ' Days');
+      console.log('Leave balance API response:', data);
+      // Defensive: fallback to 0 if missing or not a number
+      var vacation = (typeof data.vacation === 'number' && !isNaN(data.vacation)) ? data.vacation : 0;
+      var sick     = (typeof data.sick === 'number' && !isNaN(data.sick)) ? data.sick : 0;
+      var cto      = (typeof data.cto === 'number' && !isNaN(data.cto)) ? data.cto : 0;
+      var special  = (typeof data.special === 'number' && !isNaN(data.special)) ? data.special : 0;
 
-      $('#vlBalance').text(data.vacation + ' Days');
+      $('#vacation').text(vacation + ' Days');
+      $('#sick').text(sick + ' Days');
+      $('#cto').text(cto + ' Days');
+      $('#special').text(special + ' Days');
+
+      $('#vlBalance').text(vacation + ' Days');
+      $('#asOfDate').text(new Date().toLocaleDateString());
+    }).fail(function(jqXHR, textStatus, errorThrown) {
+      // If API fails, show 0 Days and log error
+      console.error('Failed to fetch leave balances:', textStatus, errorThrown);
+      $('#vacation').text('0 Days');
+      $('#sick').text('0 Days');
+      $('#cto').text('0 Days');
+      $('#special').text('0 Days');
+      $('#vlBalance').text('0 Days');
       $('#asOfDate').text(new Date().toLocaleDateString());
     });
   }

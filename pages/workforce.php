@@ -41,7 +41,7 @@ date_default_timezone_set('Asia/Manila');
         </div>
 
         <!-- 💼 Vacant Positions -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+        <!-- <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
           <div class="small-box bg-warning clickable-card" data-file="../partials/vacant_positions.php">
             <div class="inner">
               <h3>18</h3>
@@ -49,10 +49,10 @@ date_default_timezone_set('Asia/Manila');
             </div>
             <div class="icon"><i class="fas fa-briefcase"></i></div>
           </div>
-        </div>
+        </div> -->
 
         <!-- 📈 Performance Index -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+        <!-- <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
           <div class="small-box bg-info clickable-card" data-file="../partials/performance_index.php">
             <div class="inner">
               <h3>91.4%</h3>
@@ -60,16 +60,27 @@ date_default_timezone_set('Asia/Manila');
             </div>
             <div class="icon"><i class="fas fa-chart-line"></i></div>
           </div>
-        </div>
+        </div> -->
 
         <!-- 🕓 Attendance Rate -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+        <!-- <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
           <div class="small-box bg-secondary clickable-card" data-file="../partials/attendance.php">
             <div class="inner">
               <h3>96.8%</h3>
               <p>Attendance Rate</p>
             </div>
             <div class="icon"><i class="fas fa-clock"></i></div>
+          </div>
+        </div> -->
+
+         <!-- 🗂️ Leave Management -->
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+          <div class="small-box bg-success clickable-card" data-file="../partials/mayor_pending_approval.php">
+            <div class="inner">
+              <h3 id="pendingLeavesCount">0</h3>
+              <p>Leave Management</p>
+            </div>
+            <div class="icon"><i class="fas fa-file-signature"></i></div>
           </div>
         </div>
 
@@ -98,22 +109,25 @@ include_once('../partials/modals/modal_EmpList.php');?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+
 let charts = {};
 let deptChart;
+
+function bindFilterDept() {
+  $('#filterDept').off('change').on('change', function(){
+    const dept = $(this).val();
+    initializeCharts(dept);
+    loadDeptChart();
+    updateTotalWorkforce(dept);
+  });
+}
 
 // Load summary on page load (default all departments)
 $('#dynamicContent').load('../partials/workforce_summary.php', function(){
     loadDeptChart();
     initializeCharts();
     updateTotalWorkforce();
-
-    // Department filter
-    $('#filterDept').off('change').on('change', function(){
-        const dept = $(this).val();
-        initializeCharts(dept);
-        loadDeptChart();
-        updateTotalWorkforce(dept);
-    });
+    bindFilterDept();
 });
 
 //  Update Total Workforce 
@@ -139,31 +153,38 @@ document.querySelectorAll('.clickable-card').forEach(card => {
     const title = this.querySelector('p').innerText;
     document.getElementById('dynamicTitle').innerHTML = `<i class="fas fa-chart-pie"></i> ${title}`;
 
-    // Fetch and inject the partial content
-    fetch(file)
-      .then(response => response.text())
-      .then(html => {
-        const contentDiv = document.getElementById('dynamicContent');
-
-       
-        document.querySelectorAll('[id$="Details"]').forEach(el => el.remove());
-    
-        contentDiv.innerHTML = html;
-
-        contentDiv.querySelectorAll("script").forEach(oldScript => {
-          const newScript = document.createElement("script");
-          if (oldScript.src) {
-            newScript.src = oldScript.src; 
-          } else {
-            newScript.textContent = oldScript.textContent; 
-          }
-          document.body.appendChild(newScript);
-        });
-      })
-      .catch(() => {
-        document.getElementById('dynamicContent').innerHTML =
-          "<p class='text-center text-danger'>Unable to load content.</p>";
+    // If the card is for workforce summary, reload and update
+    if (file === '../partials/workforce_summary.php') {
+      $('#dynamicContent').load(file, function() {
+        loadDeptChart && loadDeptChart();
+        initializeCharts && initializeCharts();
+        updateTotalWorkforce && updateTotalWorkforce();
+        bindFilterDept();
       });
+    } else {
+      // Fetch and inject the partial content for other cards
+      fetch(file)
+        .then(response => response.text())
+        .then(html => {
+          const contentDiv = document.getElementById('dynamicContent');
+          document.querySelectorAll('[id$="Details"]').forEach(el => el.remove());
+          contentDiv.innerHTML = html;
+          contentDiv.querySelectorAll("script").forEach(oldScript => {
+            const newScript = document.createElement("script");
+            if (oldScript.src) {
+              newScript.src = oldScript.src; 
+            } else {
+              newScript.textContent = oldScript.textContent; 
+            }
+            document.body.appendChild(newScript);
+          });
+          bindFilterDept();
+        })
+        .catch(() => {
+          document.getElementById('dynamicContent').innerHTML =
+            "<p class='text-center text-danger'>Unable to load content.</p>";
+        });
+    }
   });
 });
 </script>

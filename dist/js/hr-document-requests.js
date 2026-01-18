@@ -1,6 +1,5 @@
 $(document).ready(function() {
 
-  // Initialize DataTable
   const table = $('#hrRequestsTable').DataTable({
     pageLength: 10,
     lengthChange: false,
@@ -15,17 +14,13 @@ $(document).ready(function() {
     $.get('../api/document_requests_api.php', { action: 'list' }, function(resp) {
       if(resp.status === 'success') {
         table.clear();
-
         resp.data.forEach(r => {
-
-          // Skip Rejected or Completed requests
           if(r.status === 'Rejected' || r.status === 'Completed') return;
-
           const requestedOn = new Date(r.requested_on).toLocaleString('en-US', { hour12: true });
           const fullName = r.Fname
-          + (r.Mname ? ' ' + r.Mname : '')
-          + ' ' + r.Lname
-          + (r.Extension ? ' ' + r.Extension : '');
+            + (r.Mname ? ' ' + r.Mname : '')
+            + ' ' + r.Lname
+            + (r.Extension ? ' ' + r.Extension : '');
           let actions = '';
 
           if(r.status === 'Requested') {
@@ -38,7 +33,6 @@ $(document).ready(function() {
               <button class="btn btn-primary btn-sm release-btn" data-id="${r.id}" data-toggle="tooltip" title="Mark as completed"><i class="fas fa-box-open"></i></button>
             `;
           }
-
           const rowNode = table.row.add([
             r.EmpNo,
             fullName,
@@ -63,113 +57,138 @@ $(document).ready(function() {
 
   loadRequests();
 
-
-  // Approve button
-    $(document).on('click', '.approve-btn', function() {
-    const id = $(this).data('id');
-    const rowNode = $(this).closest('tr');
-
+  function showSuccess(title, message) {
     Swal.fire({
-      title: 'Approve this request?',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, approve',
-      cancelButtonText: 'Cancel'
-    }).then(result => {
-      if(result.isConfirmed){
-        $.post('../api/document_requests_api.php', { 
-          action: 'update_status', 
-          id, 
-          status: 'Pending' 
-        }, function(resp) {
-          if(resp.status === 'success'){
-            updateRowButtons(rowNode, 'Pending');
-            Swal.fire('Success', resp.message, 'success');
-          } else {
-            // Email failed or other error
-            Swal.fire('Error', resp.message, 'error');
-          }
-        }, 'json').fail(function() {
-          Swal.fire('Error', 'Unexpected error occurred.', 'error');
-        });
-      }
+      icon: 'success',
+      title: title,
+      text: message,
+      timer: 1500,
+      showConfirmButton: false
     });
+  }
+
+  function updateStatus(options) {
+    $(document).on('click', options.selector, function () {
+      const id = $(this).data('id');
+      const rowNode = $(this).closest('tr');
+
+      const swalConfig = {
+        title: options.confirmTitle || 'Confirm action?',
+        text: options.confirmText || '',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'Cancel'
+      };
+
+      if (options.requiresNote) {
+        swalConfig.input = 'text';
+        swalConfig.inputLabel = options.noteLabel || 'Reason';
+        swalConfig.inputPlaceholder = options.notePlaceholder || 'Enter note...';
+        swalConfig.preConfirm = (note) => {
+          if (!note) Swal.showValidationMessage('Please enter a reason');
+          return note;
+        };
+      }
+
+      Swal.fire(swalConfig).then(result => {
+        if (!result.isConfirmed) return;
+        const note = options.requiresNote ? result.value : null;
+        // Show loading modal immediately
+        Swal.fire({
+          title: '<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><div class="swal2-loader" style="border:4px solid #f3f3f3;border-top:4px solid #3498db;border-radius:50%;width:32px;height:32px;animation:spin 1s linear infinite;"></div><span>Processing...</span></div>',
+          html: `<div style="margin-top:10px;">${options.processingText || 'Please wait...'}</div>
+          <style>
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            .swal2-loader { display:inline-block; }
+          </style>`,
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+          }
+        });
+        const minLoadingTime = 1000; 
+        const startTime = Date.now();
+        setTimeout(() => {
+          $.ajax({
+            url: options.ajaxUrl,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+              action: 'update_status',
+              id: id,
+              status: options.status,
+              note: note
+            },
+            success: function(resp) {
+              const elapsed = Date.now() - startTime;
+              const remaining = minLoadingTime - elapsed;
+              setTimeout(() => {
+                Swal.close();
+                if (resp.status === 'success') {
+                  if (typeof options.rowUpdateCallback === 'function') {
+                    options.rowUpdateCallback(rowNode, resp);
+                  } else if (typeof table !== 'undefined') {
+                    table.row(rowNode).remove().draw(false);
+                  }
+                  showSuccess(options.successTitle || options.status + '!', resp.message);
+                } else {
+                  Swal.fire('Error', resp.message, 'error');
+                }
+              }, remaining > 0 ? remaining : 0);
+            },
+            error: function() {
+              const elapsed = Date.now() - startTime;
+              const remaining = minLoadingTime - elapsed;
+              setTimeout(() => {
+                Swal.close();
+                Swal.fire('Error', 'Unexpected error occurred.', 'error');
+              }, remaining > 0 ? remaining : 0);
+            }
+          });
+        }, 100);
+      });
+    });
+  }
+  //Approve button
+  updateStatus({
+    selector: '.approve-btn',
+    confirmTitle: 'Approve this request?',
+    confirmText: 'This will approve the request.',
+    status: 'Pending',
+    ajaxUrl: '../api/document_requests_api.php',
+    processingText: 'Please wait while the request is being approved...',
+    rowUpdateCallback: function(rowNode, resp) {
+      updateRowButtons(rowNode, 'Pending'); // Custom callback if needed
+    }
   });
 
-  // Reject button with HR notes
-    $(document).on('click', '.reject-btn', function() {
-    const id = $(this).data('id');
-    const rowNode = $(this).closest('tr');
-
-    Swal.fire({
-      title: 'Reject this request?',
-      input: 'text',
-      inputLabel: 'Reason for rejection',
-      inputPlaceholder: 'Enter note for employee...',
-      showCancelButton: true,
-      confirmButtonText: 'Reject',
-      cancelButtonText: 'Cancel',
-      preConfirm: (note) => {
-        if(!note) Swal.showValidationMessage('Please enter a reason for rejection');
-        return note;
-      }
-    }).then(result => {
-      if(result.isConfirmed){
-        const note = result.value;
-
-        $.post('../api/document_requests_api.php', {
-          action: 'update_status',
-          id: id,
-          status: 'Rejected',
-          note: note  
-        }, function(resp) {
-          if(resp.status === 'success'){
-            table.row(rowNode).remove().draw(false);
-            Swal.fire('Rejected!', resp.message, 'success');
-          } else {
-            Swal.fire('Error', resp.message, 'error');
-          }
-        }, 'json').fail(function() {
-          Swal.fire('Error', 'Unexpected error occurred.', 'error');
-        });
-      }
-    });
+  //Reject button
+  updateStatus({
+    selector: '.reject-btn',
+    confirmTitle: 'Reject this request?',
+    confirmText: 'This will reject the request.',
+    status: 'Rejected',
+    requiresNote: true,
+    noteLabel: 'Reason for rejection',
+    notePlaceholder: 'Enter note for employee...',
+    ajaxUrl: '../api/document_requests_api.php',
+    processingText: 'Please wait while the request is being rejected...'
   });
 
-  // Release / Complete button
-    $(document).on('click', '.release-btn', function() {
-    const id = $(this).data('id');
-    const rowNode = $(this).closest('tr');
-
-    Swal.fire({
-      title: 'Mark as Completed?',
-      text: "This will notify the employee that the document is ready for pick-up.",
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, complete',
-      cancelButtonText: 'Cancel'
-    }).then(result => {
-      if(result.isConfirmed){
-        $.post('../api/document_requests_api.php', { 
-          action: 'update_status', 
-          id, 
-          status: 'Completed' 
-        }, function(resp) {
-          if(resp.status === 'success'){
-            table.row(rowNode).remove().draw(false);
-            Swal.fire('Completed!', resp.message, 'success');
-          } else {
-            // Email failed or other error
-            Swal.fire('Error', resp.message, 'error');
-          }
-        }, 'json').fail(function() {
-          Swal.fire('Error', 'Unexpected error occurred.', 'error');
-        });
-      }
-    });
+  //Release / Complete button
+  updateStatus({
+    selector: '.release-btn',
+    confirmTitle: 'Mark as Completed?',
+    confirmText: 'This will notify the employee that the document is ready for pick-up.',
+    status: 'Completed',
+    ajaxUrl: '../api/document_requests_api.php',
+    processingText: 'Please wait while the document status is being updated...'
   });
 
-  // Update row buttons for Pending
+
+
   function updateRowButtons(rowNode, status) {
     const $row = $(rowNode);
     $row.attr('data-status', status);
@@ -180,4 +199,5 @@ $(document).ready(function() {
       $('[data-toggle="tooltip"]').tooltip();
     }
   }
+
 });

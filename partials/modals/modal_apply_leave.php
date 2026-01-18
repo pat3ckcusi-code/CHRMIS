@@ -66,6 +66,7 @@
 
           <!-- SPECIAL NOTES -->
           <div class="alert alert-info d-none" id="specialNote"></div>
+          <div class="alert alert-warning d-none" id="slToVlWarning"></div>
 
         </div>
 
@@ -96,6 +97,7 @@ $('#leaveType').on('change', function () {
   $('#leaveHint').text('');
   $('#docHint').text('');
   $('#specialNote').addClass('d-none').text('');
+  $('#slToVlWarning').addClass('d-none').text('');
 
   switch (type) {
     case 'Vacation':
@@ -106,6 +108,12 @@ $('#leaveType').on('change', function () {
       $('#leaveHint').text('Medical certificate required for hospitalization or prolonged illness.');
       $('#docUpload').removeClass('d-none');
       $('#docHint').text('Medical certificate / hospital record');
+      // Check sick leave balance
+      $.getJSON('/CHRMIS/api/leave/balance.php', function(bal) {
+        if (bal && (bal.sick === 0 || bal.sick === "0")) {
+          $('#slToVlWarning').removeClass('d-none').text('You have no available Sick Leave credits. Filing Sick Leave will be deducted from your Vacation Leave balance.');
+        }
+      });
       break;
 
     case 'Maternity':
@@ -197,17 +205,37 @@ $('#leaveType').on('change', function () {
     $el.removeClass('is-invalid');
   }
 
-  // Initialize mins when modal opens
-  $('#applyLeaveModal').on('show.bs.modal', function () {
+
+  // Helper to update min attributes based on leave type
+  function updateDateMins() {
+    const leaveType = $('#leaveType').val();
     const t = todayStr();
-    $from.attr('min', t);
+    if (leaveType === 'Vacation') {
+      $from.attr('min', t); 
+    } else {
+      $from.removeAttr('min'); 
+    }
     if ($from.val()) {
       $to.attr('min', $from.val());
     } else {
-      $to.attr('min', t);
+      if (leaveType === 'Vacation') {
+        $to.attr('min', t);
+      } else {
+        $to.removeAttr('min');
+      }
     }
+  }
+
+  // Initialize mins when modal opens
+  $('#applyLeaveModal').on('show.bs.modal', function () {
+    updateDateMins();
     clearError($from, $fromErr);
     clearError($to, $toErr);
+  });
+
+  // Update mins when leave type changes
+  $('#leaveType').on('change', function () {
+    updateDateMins();
   });
 
   $from.on('change', function () {
@@ -260,8 +288,8 @@ $('#leaveType').on('change', function () {
     } else if (isWeekend(fromVal)) {
       showError($from, $fromErr, 'Weekends are not allowed. Please choose a weekday.');
       valid = false;
-    } else if (fromVal < t) {
-      showError($from, $fromErr, 'Date From cannot be in the past.');
+    } else if ($('#leaveType').val() === 'Vacation' && fromVal < t) {
+      showError($from, $fromErr, 'Date From cannot be in the past for Vacation Leave.');
       valid = false;
     }
     if (!toVal) {
@@ -318,7 +346,6 @@ $('#applyLeaveForm').on('submit', function (e) {
       if (resp && resp.success) {
         Swal.fire('Success', 'Your leave application has been filed.', 'success').then(() => {
           $('#applyLeaveModal').modal('hide');
-          // reload to reflect new data; you may replace with a more targeted refresh
           location.reload();
         });
       } else {

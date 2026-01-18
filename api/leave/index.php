@@ -8,7 +8,7 @@ require_once '../../controllers/LeaveController.php';
 header('Content-Type: application/json');
 
 $repo = new LeaveRepository($pdo);
-$service = new LeaveService($repo);
+$service = new LeaveService($repo, $pdo);
 $controller = new LeaveController($service);
 
 echo json_encode($controller->index(currentUserId()));

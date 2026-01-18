@@ -55,6 +55,7 @@ try {
         $_SESSION['Dept']     = $loginResult['Dept'] ?? null;
         $_SESSION['EmpID']    = $loginResult['EmpNo'] ?? null;
         $_SESSION['Access']   = $loginResult['access'];
+        $_SESSION['access_level']   = $loginResult['access_level'] ?? null;
         $_SESSION['Status']   = $loginResult['Status'] ?? null;
         $_SESSION['UserType'] = $loginResult['userType'] ?? null;
 

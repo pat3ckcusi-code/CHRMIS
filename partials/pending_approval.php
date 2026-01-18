@@ -5,6 +5,9 @@ require_once('../includes/initialize.php');
 // Get AO's department
 $dept = $_SESSION['Dept'];
 
+
+$access_level = isset($_SESSION['access_level']) ? trim($_SESSION['access_level']) : '';
+
 // Fetch pending Leave applications
 $sqlLeave = "SELECT DISTINCT fl.*, i.Fname, i.Lname, i.Dept
              FROM filedleave fl
@@ -43,6 +46,8 @@ $stmtLocator = $pdo->prepare($sqlLocator);
 $stmtLocator->execute([$dept]);
 $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
+<?php if ($access_level === 'Department Head'): ?>
 
 <!-- Pending Leave Applications -->
 <h5 class="mt-4"><i class="fas fa-file-contract text-primary"></i> Pending Leave Applications</h5>
@@ -87,6 +92,8 @@ $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
   </tbody>
 </table>
+
+<?php endif; ?>
 
 <!-- ETA Pending Applications -->
 <h5 class="mt-4"><i class="fas fa-history text-secondary"></i> Pending ETA Applications</h5>
@@ -172,32 +179,112 @@ $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
 
 <script>
   // Leave Application Handlers
-  $(document).on('click', '.approve-leave-btn', function() {
+  $(document).on('click', '.approve-leave-btn', function () {
+  const leaveId = $(this).data('id');
+  Swal.fire({
+    title: 'Approve Leave Application?',
+    text: 'This will approve the leave application.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#28a745',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'Yes, approve it!'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      Swal.fire({
+        title: 'Processing...',
+        text: 'Please wait while the leave application is being approved.',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      $.ajax({
+        url: '../api/api_leave.php?recommend_leave',
+        type: 'POST',
+        dataType: 'json',
+        data: { leave_id: leaveId },
+        success: function (response) {
+          Swal.close();
+
+          if (response.success) {
+            Swal.fire(
+              'Approved!',
+              'Leave application has been approved.',
+              'success'
+            ).then(() => location.reload());
+          } else {
+            Swal.fire(
+              'Error!',
+              response.message || 'Failed to approve leave.',
+              'error'
+            );
+          }
+        },
+        error: function () {
+          Swal.close();
+          Swal.fire('Error!', 'Server error occurred.', 'error');
+        }
+      });
+    }
+  });
+});
+
+
+  // Reject button with Leave notes
+  $(document).on('click', '.reject-leave-btn', function () {
     const leaveId = $(this).data('id');
-    
+
     Swal.fire({
-      title: 'Approve Leave Application?',
-      text: "This will approve the leave application.",
-      icon: 'question',
+      title: 'Reject this request?',
+      input: 'text',
+      inputLabel: 'Reason for rejection',
+      inputPlaceholder: 'Enter note for employee...',
       showCancelButton: true,
-      confirmButtonColor: '#28a745',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, approve it!'
+      confirmButtonText: 'Reject',
+      cancelButtonText: 'Cancel',
+      preConfirm: (note) => {
+        if (!note) {
+          Swal.showValidationMessage('Please enter a reason for rejection');
+        }
+        return note;
+      }
     }).then((result) => {
       if (result.isConfirmed) {
+        Swal.fire({
+          title: 'Processing...',
+          text: 'Please wait while the leave application is being rejected.',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+
         $.ajax({
-          url: '../api/api_leave.php?approve_leave',
+          url: '../api/api_leave.php?reject_leave',
           type: 'POST',
-          data: { leave_id: leaveId },
           dataType: 'json',
-          success: function(response) {
+          data: {
+            leave_id: leaveId,
+            rejection_note: result.value
+          },
+          success: function (response) {
+            Swal.close(); 
             if (response.success) {
-              Swal.fire('Approved!', 'Leave application has been approved.', 'success').then(() => location.reload());
+              Swal.fire(
+                'Rejected!',
+                'Leave application has been rejected.',
+                'error'
+              ).then(() => location.reload());
             } else {
-              Swal.fire('Error!', response.message || 'Failed to approve leave.', 'error');
+              Swal.fire('Error!', response.message || 'Failed to reject leave.', 'error');
             }
           },
-          error: function() {
+          error: function () {
+            Swal.close(); 
             Swal.fire('Error!', 'Server error occurred.', 'error');
           }
         });
@@ -205,36 +292,39 @@ $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
     });
   });
 
-  $(document).on('click', '.reject-leave-btn', function() {
-    const leaveId = $(this).data('id');
+
+
+
+  // $(document).on('click', '.reject-leave-btn', function() {
+  //   const leaveId = $(this).data('id');
     
-    Swal.fire({
-      title: 'Reject Leave Application?',
-      text: "This will reject the leave application.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc3545',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, reject it!'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        $.ajax({
-          url: '../api/api_leave.php?reject_leave',
-          type: 'POST',
-          data: { leave_id: leaveId },
-          dataType: 'json',
-          success: function(response) {
-            if (response.success) {
-              Swal.fire('Rejected!', 'Leave application has been rejected.', 'error').then(() => location.reload());
-            } else {
-              Swal.fire('Error!', response.message || 'Failed to reject leave.', 'error');
-            }
-          },
-          error: function() {
-            Swal.fire('Error!', 'Server error occurred.', 'error');
-          }
-        });
-      }
-    });
-  });
+  //   Swal.fire({
+  //     title: 'Reject Leave Application?',
+  //     text: "This will reject the leave application.",
+  //     icon: 'warning',
+  //     showCancelButton: true,
+  //     confirmButtonColor: '#dc3545',
+  //     cancelButtonColor: '#6c757d',
+  //     confirmButtonText: 'Yes, reject it!'
+  //   }).then((result) => {
+  //     if (result.isConfirmed) {
+  //       $.ajax({
+  //         url: '../api/api_leave.php?reject_leave',
+  //         type: 'POST',
+  //         data: { leave_id: leaveId },
+  //         dataType: 'json',
+  //         success: function(response) {
+  //           if (response.success) {
+  //             Swal.fire('Rejected!', 'Leave application has been rejected.', 'error').then(() => location.reload());
+  //           } else {
+  //             Swal.fire('Error!', response.message || 'Failed to reject leave.', 'error');
+  //           }
+  //         },
+  //         error: function() {
+  //           Swal.fire('Error!', 'Server error occurred.', 'error');
+  //         }
+  //       });
+  //     }
+  //   });
+  // });
 </script>

@@ -64,6 +64,17 @@ include_once(PARTIALS_PATH.'header.php');
           </div>
         </div>
 
+        <!-- 🗂️ Leave Management -->
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+          <div class="small-box bg-success clickable-card" data-file="../partials/mayor_pending_approval.php">
+            <div class="inner">
+              <h3 id="pendingLeavesCount">0</h3>
+              <p>Leave Management</p>
+            </div>
+            <div class="icon"><i class="fas fa-file-signature"></i></div>
+          </div>
+        </div>
+
 
       </div>
 
@@ -96,13 +107,15 @@ $('#dynamicContent').load('../partials/workforce_summary.php', function(){
     loadDeptChart();
     initializeCharts();
     updateTotalWorkforce();
+  updatePendingCount();
 
     // Department filter
     $('#filterDept').off('change').on('change', function(){
         const dept = $(this).val();
         initializeCharts(dept);
         loadDeptChart();
-        updateTotalWorkforce(dept);
+    updateTotalWorkforce(dept);
+    updatePendingCount(dept);
     });
 });
 
@@ -116,6 +129,17 @@ function updateTotalWorkforce(dept=''){
         $('#totalWorkforce').text(total);
     })
     .catch(err=>console.error("Error updating total workforce:",err));
+}
+
+// Update pending leave & related pending applications count (AO-specific)
+function updatePendingCount(dept=''){
+  fetch(`../api/check_pending_mayor.php`)
+    .then(res => res.json())
+    .then(data => {
+      const count = data && data.pendingCount ? data.pendingCount : 0;
+      document.getElementById('pendingLeavesCount').innerText = count;
+    })
+    .catch(err=>console.error("Error updating pending leaves:",err));
 }
 
 document.querySelectorAll('.clickable-card').forEach(card => {

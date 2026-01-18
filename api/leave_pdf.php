@@ -41,6 +41,14 @@ $destination = $row['destination'] ?? '';
 $purpose = $row['LeaveTypeName'] ?? '';
 $reason  = $row['travel_detail'] ?? '';
 
+// --- Fetch leave balance ---
+$sqlBalance = "SELECT VL, SL FROM leavecredits WHERE EmpNo = :empNo LIMIT 1";
+$stmtBalance = $pdo->prepare($sqlBalance);
+$stmtBalance->execute(['empNo' => $row['EmpNo']]);
+$leaveBalance = $stmtBalance->fetch(PDO::FETCH_ASSOC) ?: [
+    'VL' => 0, 'SL' => 0
+];
+
 // sa leave type to.  check kung ano field type
 $leaveType = '';
 foreach (['LeaveType','leave_type','Type','LeaveName','Leave'] as $f) {
@@ -50,7 +58,7 @@ if ($leaveType === '') $leaveType = $purpose;
 
 
 $leaveTypeCoords = [
-    'Vacation Leave'            => [15,  76], 
+    'Vacation'            => [15,  76], 
     'Sick'                => [15, 86],
     'Maternity Leave'           => [15, 110],
     'Paternity Leave'           => [15, 120],
@@ -90,13 +98,16 @@ $pdf->SetXY(100, 56); $pdf->Write(5, $position);
 $pdf->SetXY(40, 163); $pdf->Write(5, $numDays);   
 $pdf->SetXY(40, 56); $pdf->Write(5, $datefiled);   
 
-
+//leave balances
+$pdf->SetXY(60, 205); $pdf->Write(5, $leaveBalance['VL'] ?? '0');   
+$pdf->SetXY(87, 205); $pdf->Write(5, $leaveBalance['SL'] ?? '0');
 // Mark the checkbox for the leave type
 if (isset($leaveTypeCoords[$selectedKey])) {
     [$lx, $ly] = $leaveTypeCoords[$selectedKey];
     $pdf->SetXY($lx, $ly);
     $pdf->Write(5, 'X');
 }
+
 
 
 $pdf->SetFont('Arial','',11);

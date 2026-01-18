@@ -13,6 +13,13 @@ date_default_timezone_set('Asia/Manila');
 $Deptquery = $pdo->prepare("SELECT * FROM adminusers WHERE Dept = ?");
 $Deptquery->execute([$_SESSION["Dept"]]);
 $Lrow = $Deptquery->fetch(PDO::FETCH_ASSOC);
+// Determine access level for header: prefer session, then DB, then default
+$access_level = 'Department Head / AO';
+if (isset($_SESSION['access_level']) && !empty($_SESSION['access_level'])) {
+  $access_level = $_SESSION['access_level'];
+} elseif (isset($Lrow['access_level']) && !empty($Lrow['access_level'])) {
+  $access_level = $Lrow['access_level'];
+}
 ?>
 
 <?php include("../includes/navbar.php"); ?>
@@ -38,7 +45,7 @@ $Lrow = $Deptquery->fetch(PDO::FETCH_ASSOC);
     <section class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
-          <div class="col-sm-6"><h1>Department Head / AO</h1></div>
+          <div class="col-sm-6"><h1><?php echo htmlspecialchars($access_level); ?></h1></div>
         </div>
       </div>
     </section>
@@ -136,6 +143,10 @@ include_once('../partials/footer.php');
 // include("../partials/modals/modalpassword.php");
 ?>
 <!-- Using global SweetAlert2 and jQuery loaded in partials/core_javascript.php -->
+ <!-- jQuery AJAX to load tabs with caching -->
+ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).ready(function() {
        
