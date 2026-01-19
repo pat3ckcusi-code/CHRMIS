@@ -64,7 +64,7 @@ try {
         ->setCellValue('D27', isset($rowi['GSIS'])     ? (string) $rowi['GSIS']     : '')
         ->setCellValue('D29', isset($rowi['Pagibig'])  ? (string) $rowi['Pagibig']  : '')
         ->setCellValue('D31', isset($rowi['PHealth'])  ? (string) $rowi['PHealth']  : '')
-        ->setCellValue('D32', isset($rowi['SSS'])      ? (string) $rowi['SSS']      : '')
+        ->setCellValue('D32', isset($rowi['PSN'])      ? (string) $rowi['PSN']      : '') 
         ->setCellValue('D33', isset($rowi['Tin'])      ? (string) $rowi['Tin']      : '')
         ->setCellValue('D34', isset($rowi['AgencyEmpNo']) ? (string) $rowi['AgencyEmpNo'] : '')
         ->setCellValue('I34', $rowi['EMail']        ?? '')

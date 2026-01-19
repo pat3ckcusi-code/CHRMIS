@@ -351,7 +351,7 @@ while($child = $childquery->fetch())
                 <td><input class="form-control form-control-sm" name="txtBlood" value="<?php echo htmlspecialchars($row['BloodType']); ?>"></td>
                 </tr>
 
-                <!-- GSIS, Pag-IBIG, PhilHealth, SSS -->
+                <!-- GSIS, Pag-IBIG, PhilHealth, PSN -->
                 <tr>
                 <td class="text-center align-middle fw-bold">GSIS ID NO.</td>
                 <td><input class="form-control form-control-sm" name="txtGSIS" value="<?php echo htmlspecialchars($row['GSIS']); ?>"></td>
@@ -365,8 +365,8 @@ while($child = $childquery->fetch())
                 <td><input class="form-control form-control-sm" name="txtPhilhealth"  value="<?php echo isset($row['PHealth']) ? htmlspecialchars($row['PHealth']) : ''; ?>" />
                 </tr>
                 <tr>
-                <td class="text-center align-middle fw-bold">SSS NO.</td>
-                <td><input class="form-control form-control-sm" name="txtSSS" value="<?php echo htmlspecialchars($row['SSS']); ?>"></td>
+                <td class="text-center align-middle fw-bold">PhilSys NO.</td>
+                <td><input class="form-control form-control-sm" name="txtPSN" value="<?php echo htmlspecialchars($row['PSN']); ?>"></td>
                 </tr>
                 <tr>
                 <td class="text-center align-middle fw-bold">TIN NO.</td>
@@ -808,7 +808,7 @@ while($child = $childquery->fetch())
 
 <?php
 include_once('../partials/footer.php');
-//include("../partials/modals/modalpassword.php");
+//include("../partials/modals/modalpassword.php"); 
 include("../partials/modals/modal_add_education.php");
 ?>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">

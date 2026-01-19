@@ -11,7 +11,7 @@ $response = [
     "icon"    => "error"
 ];
 try {
-    // Get EmpNo (from session or form)
+    // Get EmpNo (from session or form) 
     $empNo = $_POST['txtEmpNo'] ?? null;
 
     // === PERSONAL INFORMATION (i) ===
@@ -27,7 +27,7 @@ try {
         $sql = "UPDATE i SET 
             Lname=?, Fname=?, Extension=?, Mname=?, 
             BirthDate=?, PlaceBirth=?, Gender=?, Civil=?, Height=?, Weight=?, 
-            BloodType=?, GSIS=?, Pagibig=?, PHealth=?, SSS=?, Tin=?, AgencyEmpNo=?,
+            BloodType=?, GSIS=?, Pagibig=?, PHealth=?, PSN=?, Tin=?, AgencyEmpNo=?,
             Citizenship=?, Country=?,
             HouseNo=?, Street=?, Subd=?, Brgy=?, City=?, Province=?, Zip=?,
             Perm_House=?, Perm_Street=?, Perm_Subd=?, Perm_Brgy=?, Perm_City=?, Perm_Province=?, Perm_Zip=?,
@@ -37,7 +37,7 @@ try {
         $stmt->execute([
             $_POST['txtLname'] ?? null, $_POST['txtFname'] ?? null, $_POST['txtExt'] ?? null, $_POST['txtMname'] ?? null,
             $_POST['txtDate'] ?? null, $_POST['txtPlace'] ?? null, $_POST['txtSex'] ?? null, $_POST['rdCivil'] ?? null, $_POST['txtHeight'] ?? null, $_POST['txtWeight'] ?? null,
-            $_POST['txtBlood'] ?? null, $_POST['txtGSIS'] ?? null, $_POST['txtPagibig'] ?? null, $_POST['txtPhilhealth'] ?? null, $_POST['txtSSS'] ?? null, $_POST['txtTIN'] ?? null, $_POST['txtAgency'] ?? null,
+            $_POST['txtBlood'] ?? null, $_POST['txtGSIS'] ?? null, $_POST['txtPagibig'] ?? null, $_POST['txtPhilhealth'] ?? null, $_POST['txtPSN'] ?? null, $_POST['txtTIN'] ?? null, $_POST['txtAgency'] ?? null,
             $citizenship, $_POST['ddCountry'] ?? null,
             $_POST['txtHouse'] ?? null, $_POST['txtStreet'] ?? null, $_POST['txtSubd'] ?? null, $_POST['txtBrgy'] ?? null, $_POST['txtCity'] ?? null, $_POST['txtProvince'] ?? null, $_POST['txtZip1'] ?? null,
             $_POST['txtHouse1'] ?? null, $_POST['txtStreet1'] ?? null, $_POST['txtSubd1'] ?? null, $_POST['txtBrgy1'] ?? null, $_POST['txtCity1'] ?? null, $_POST['txtProvince1'] ?? null, $_POST['txtZip2'] ?? null,
@@ -48,7 +48,7 @@ try {
         $sql = "INSERT INTO i (
             EmpNo, Lname, Fname, Extension, Mname,
             BirthDate, PlaceBirth, Gender, Civil, Height, Weight,
-            BloodType, GSIS, Pagibig, PHealth, SSS,
+            BloodType, GSIS, Pagibig, PHealth, PSN,
             Citizenship, Country,
             HouseNo, Street, Subd, Brgy, City, Province, Zip,
             Perm_House, Perm_Street, Perm_Subd, Perm_Brgy, Perm_City, Perm_Province, Perm_Zip,
@@ -70,7 +70,7 @@ try {
                     $_POST['txtGSIS'] ?? null,
                     $_POST['txtPagibig'] ?? null,
                     $_POST['txtPhilhealth'] ?? null,
-                    $_POST['txtSSS'] ?? null,
+                    $_POST['txtPSN'] ?? null,
                     $_POST['txtTIN'] ?? null,
                     $_POST['txtAgency'] ?? null,
                     $citizenship,
