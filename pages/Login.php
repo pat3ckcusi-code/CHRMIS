@@ -109,7 +109,7 @@ if (isset($_SESSION[$session_id])) {
     </div>
     <div style="margin-top: 2px; font-size: 0.75em;">
     Developed by: 
-    <a href="https://www.facebook.com/tyukusi" target="_blank" style="color: #555;">Patrick D. Cusi</a>
+    <a href="https://www.facebook.com/tyukusi" target="_blank" style="color: #555;">Patrick D Cusi</a>
     </div>
     <div style="margin-top: 2px; font-size: 0.75em;">
         Project Manager: <a href="https://www.facebook.com/profile.php?id=61556774194695" target="_blank" style="color: #555;"> Marian Teresa Tagupa</a>
