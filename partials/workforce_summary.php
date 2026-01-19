@@ -367,47 +367,78 @@ function initializeCharts(dept=''){
           }
         }
       });
-      charts.tenure=new Chart(ctxTenure,{
-        type:'bar',
-        data:{
-          labels:data.tenure.map(t=>t.ServiceLength),
-          datasets:[{label:'Employees',data:data.tenure.map(t=>t.total),backgroundColor:'#2600ffff'}]
-        },
-        options:{
-          ...commonOptions,
-          scales:{y:{beginAtZero:true,ticks:{precision:0}}},
-          onClick: async function(e, elements) {
-            let points = elements && elements.length ? elements : this.getElementsAtEventForMode(e, 'nearest', {intersect:true}, true);
-            if(points.length){
-              const index = points[0].index;
-              const selectedService = data.tenure[index].ServiceLength;
-              await showTenureEmployees(selectedService, dept);
+      // Tenure chart: use CSC Loyalty Award milestone years
+      const milestoneYears = [10,15,20,25,30,35,40];
+
+      // fetch employee list to compute counts per milestone (exact years)
+      fetch(`../api/get_department_employees.php?dept=${encodeURIComponent(dept)}`)
+        .then(r=>r.json())
+        .then(employees=>{
+          const counts = milestoneYears.map(m => {
+            return employees.reduce((acc, emp) => {
+              const hired = new Date(emp.date_hired);
+              if (isNaN(hired)) return acc;
+              const today = new Date();
+              const years = today.getFullYear() - hired.getFullYear() - (today < new Date(today.getFullYear(), hired.getMonth(), hired.getDate()) ? 1 : 0);
+              return acc + (years === m ? 1 : 0);
+            }, 0);
+          });
+
+          charts.tenure = new Chart(ctxTenure,{
+            type: 'bar',
+            data: {
+              labels: milestoneYears.map(y=>`${y} yrs`),
+              datasets: [{ label: 'Employees', data: counts, backgroundColor: '#2600ffff' }]
+            },
+            options: {
+              ...commonOptions,
+              scales: { y: { beginAtZero:true, ticks:{precision:0} } },
+              onClick: async function(e, elements) {
+                let points = elements && elements.length ? elements : this.getElementsAtEventForMode(e, 'nearest', {intersect:true}, true);
+                if(points.length){
+                  const index = points[0].index;
+                  const selectedYear = milestoneYears[index];
+                  await showTenureEmployees(`${selectedYear} yrs`, dept);
+                }
+              }
             }
-          }
-        }
-      });
-// Show employees in selected length of service group in a modal
+          });
+        })
+        .catch(err=>{
+          console.error('Failed to load tenure employee list:', err);
+        });
+// Show employees in selected length of service milestone (CSC Loyalty Award)
 async function showTenureEmployees(serviceLength, dept='') {
   try {
+    const milestone = parseInt(serviceLength);
+    if (isNaN(milestone)) {
+      Swal.fire("Info", `Invalid milestone: ${serviceLength}` , "info");
+      return;
+    }
+
     // Fetch all employees for the department (or all)
     const res = await fetch(`../api/get_department_employees.php?dept=${encodeURIComponent(dept)}`);
     const employees = await res.json();
-    // Filter by length of service
-    let filtered = employees.filter(emp => {
+
+    function getYears(emp) {
       const hired = new Date(emp.date_hired);
+      if (isNaN(hired)) return null;
       const today = new Date();
-      const years = today.getFullYear() - hired.getFullYear() - (today < new Date(today.getFullYear(), hired.getMonth(), hired.getDate()) ? 1 : 0);
-      if (serviceLength === '<1 yr') return years < 1;
-      if (serviceLength === '1-4 yrs') return years >= 1 && years <= 4;
-      if (serviceLength === '5-9 yrs') return years >= 5 && years <= 9;
-      if (serviceLength === '10-14 yrs') return years >= 10 && years <= 14;
-      if (serviceLength === '15-19 yrs') return years >= 15 && years <= 19;
-      if (serviceLength === '20+ yrs') return years >= 20;
-      return false;
-    });
+      return today.getFullYear() - hired.getFullYear() - (today < new Date(today.getFullYear(), hired.getMonth(), hired.getDate()) ? 1 : 0);
+    }
+
+    function getAward(years) {
+      if ([10,15].includes(years)) return 'Bronze';
+      if ([20,25].includes(years)) return 'Silver';
+      if ([30,35,40].includes(years)) return 'Gold';
+      return '';
+    }
+
+    // Filter employees who exactly match the milestone year
+    let filtered = employees.filter(emp => getYears(emp) === milestone);
 
     if (!filtered.length) {
-      Swal.fire("Info", `No employees found for length of service ${serviceLength}` , "info");
+      Swal.fire("Info", `No employees found for milestone ${serviceLength}` , "info");
       return;
     }
 
@@ -417,23 +448,28 @@ async function showTenureEmployees(serviceLength, dept='') {
     let sortColumn = null;
     let sortAsc = true;
     let searchKeyword = '';
-    const colKeys = ["EmpNo", "FullName", "Position", "Dept", "Gender", "Age", "EmploymentStatus", "date_hired"];
+    const colKeys = ["EmpNo", "FullName", "Position", "Dept", "Gender", "Age", "EmploymentStatus", "Award", "date_hired"];
 
     function renderRows() {
       const start = (currentPage - 1) * rowsPerPage;
       const pageData = filtered.slice(start, start + rowsPerPage);
-      return pageData.map(emp => `
-        <tr>
-          <td>${emp.EmpNo}</td>
-          <td>${emp.FullName}</td>
-          <td>${emp.Position ?? ''}</td>
-          <td>${emp.Dept ?? ''}</td>
-          <td>${emp.Gender}</td>
-          <td>${emp.Age}</td>
-          <td>${emp.EmploymentStatus}</td>
-          <td>${emp.date_hired}</td>
-        </tr>
-      `).join("");
+      return pageData.map(emp => {
+        const years = getYears(emp);
+        const award = getAward(years);
+        return `
+          <tr>
+            <td>${emp.EmpNo}</td>
+            <td>${emp.FullName}</td>
+            <td>${emp.Position ?? ''}</td>
+            <td>${emp.Dept ?? ''}</td>
+            <td>${emp.Gender}</td>
+            <td>${emp.Age}</td>
+            <td>${emp.EmploymentStatus}</td>
+            <td>${award}</td>
+            <td>${emp.date_hired}</td>
+          </tr>
+        `;
+      }).join("");
     }
 
     function applySort(colIndex) {
@@ -444,8 +480,14 @@ async function showTenureEmployees(serviceLength, dept='') {
         sortAsc = true;
       }
       filtered.sort((a, b) => {
-        const valA = (a[key] ?? "").toString().toLowerCase();
-        const valB = (b[key] ?? "").toString().toLowerCase();
+        let valA, valB;
+        if (key === 'Award') {
+          valA = getAward(getYears(a)) || '';
+          valB = getAward(getYears(b)) || '';
+        } else {
+          valA = (a[key] ?? "").toString().toLowerCase();
+          valB = (b[key] ?? "").toString().toLowerCase();
+        }
         if (key === "Age" || key === "EmpNo") {
           return sortAsc
             ? (parseInt(valA) || 0) - (parseInt(valB) || 0)
@@ -459,22 +501,11 @@ async function showTenureEmployees(serviceLength, dept='') {
 
     function applySearch(keyword) {
       searchKeyword = keyword.toLowerCase();
-      filtered = employees.filter(emp =>
-        Object.values(emp).some(v =>
-          String(v).toLowerCase().includes(searchKeyword)
-        ) && (function() {
-          const hired = new Date(emp.date_hired);
-          const today = new Date();
-          const years = today.getFullYear() - hired.getFullYear() - (today < new Date(today.getFullYear(), hired.getMonth(), hired.getDate()) ? 1 : 0);
-          if (serviceLength === '<1 yr') return years < 1;
-          if (serviceLength === '1-4 yrs') return years >= 1 && years <= 4;
-          if (serviceLength === '5-9 yrs') return years >= 5 && years <= 9;
-          if (serviceLength === '10-14 yrs') return years >= 10 && years <= 14;
-          if (serviceLength === '15-19 yrs') return years >= 15 && years <= 19;
-          if (serviceLength === '20+ yrs') return years >= 20;
-          return false;
-        })()
-      );
+      filtered = employees.filter(emp => {
+        const years = getYears(emp);
+        if (years !== milestone) return false;
+        return Object.values(emp).some(v => String(v).toLowerCase().includes(searchKeyword)) || (getAward(years).toLowerCase().includes(searchKeyword));
+      });
       currentPage = 1;
       updateTable();
     }
@@ -508,7 +539,8 @@ async function showTenureEmployees(serviceLength, dept='') {
           .emp-table th:nth-child(5), .emp-table td:nth-child(5) { width: 60px; text-align:center; }
           .emp-table th:nth-child(6), .emp-table td:nth-child(6) { width: 50px; text-align:center; }
           .emp-table th:nth-child(7), .emp-table td:nth-child(7) { width: 120px; }
-          .emp-table th:nth-child(8), .emp-table td:nth-child(8) { width: 120px; }
+          .emp-table th:nth-child(8), .emp-table td:nth-child(8) { width: 100px; }
+          .emp-table th:nth-child(9), .emp-table td:nth-child(9) { width: 120px; }
         </style>
 
         <input id="tenureSearchBox" type="text" class="form-control mb-2" placeholder="Search..." />
@@ -524,7 +556,8 @@ async function showTenureEmployees(serviceLength, dept='') {
                 <th data-col="4">Gender</th>
                 <th data-col="5">Age</th>
                 <th data-col="6">Status</th>
-                <th data-col="7">Date Hired</th>
+                <th data-col="7">Award</th>
+                <th data-col="8">Date Hired</th>
               </tr>
             </thead>
             <tbody id="tenureEmpTableBody"></tbody>
