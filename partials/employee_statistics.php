@@ -26,7 +26,8 @@ $apiUrl = '/CHRMIS/api/get_employee_statistics.php';
 .modal .table th, .modal .table td { vertical-align: middle; }
 </style>
 <script>
-const apiUrl = '<?= htmlspecialchars($apiUrl) ?>';
+// use a window-scoped name to avoid redeclaration when this partial is loaded multiple times
+window._employeeStatisticsApiUrl = window._employeeStatisticsApiUrl || '<?= htmlspecialchars($apiUrl) ?>';
 
 function formatBadge(count, type) {
     let cls = 'secondary';
@@ -114,7 +115,7 @@ function fetchStats(month, year) {
     const $tbody = $('#statsBody');
     $tbody.html(`<tr><td colspan="6" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>`);
 
-    $.getJSON(apiUrl, { month: month, year: year })
+    $.getJSON(window._employeeStatisticsApiUrl, { month: month, year: year })
         .done(function(resp){
             if (resp && resp.success) {
                 // store current month/year for modal links
