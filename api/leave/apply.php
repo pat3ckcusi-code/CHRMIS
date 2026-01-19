@@ -12,25 +12,42 @@ $leaveType = $_POST['leave_type'] ?? null;
 $dateFrom = $_POST['date_from'] ?? null;
 $dateTo = $_POST['date_to'] ?? null;
 $reason = $_POST['reason'] ?? null;
+$dates = $_POST['dates'] ?? null; // expected as array of YYYY-MM-DD strings
 
-if (!$leaveType || !$dateFrom || !$dateTo) {
+if (!$leaveType) {
     http_response_code(400);
-    echo json_encode(['error' => 'Missing required fields: leave_type, date_from, date_to']);
+    echo json_encode(['error' => 'Missing required field: leave_type']);
     exit;
+}
+
+// If multi-dates were submitted, require at least one; otherwise require date_from/date_to
+if (!empty($dates)) {
+    if (!is_array($dates) || count($dates) === 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'dates must be a non-empty array of YYYY-MM-DD strings']);
+        exit;
+    }
+} else {
+    if (!$dateFrom || !$dateTo) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing required fields: date_from, date_to']);
+        exit;
+    }
 }
 
 // Normalize dates
-$df = DateTime::createFromFormat('Y-m-d', $dateFrom);
-$dt = DateTime::createFromFormat('Y-m-d', $dateTo);
+$df = $dateFrom ? DateTime::createFromFormat('Y-m-d', $dateFrom) : null;
+$dt = $dateTo ? DateTime::createFromFormat('Y-m-d', $dateTo) : null;
 $today = new DateTime();
 $today->setTime(0,0,0);
 
-if (!$df || !$dt) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid date format. Use YYYY-MM-DD.']);
-    exit;
+if (empty($dates)) {
+    if (!$df || !$dt) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid date format. Use YYYY-MM-DD.']);
+        exit;
+    }
 }
-
 
 $map = [
     'Vacation' => 'VL',
@@ -50,33 +67,94 @@ $map = [
 $leaveCode = $map[$leaveType] ?? strtoupper(substr(preg_replace('/\s+/', '', $leaveType), 0, 3));
 
 // Only apply 'Date From cannot be in the past' for Vacation Leave (VL)
-if ($leaveCode === 'VL' && $df < $today) {
+// When using multi-date selection, each date is validated later — skip the early check.
+if (empty($dates) && $leaveCode === 'VL' && $df < $today) {
     http_response_code(400);
     echo json_encode(['error' => 'Date From cannot be in the past for Vacation Leave.']);
     exit;
 }
 
-if ($dt < $df) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Date To cannot be before Date From.']);
-    exit;
-}
 
-// Collect all dates in range and validate weekends
-$period = new DatePeriod($df, new DateInterval('P1D'), (clone $dt)->modify('+1 day'));
-$dates = [];
-foreach ($period as $d) {
-    $w = (int)$d->format('w'); // 0=Sun,6=Sat
-    if ($w === 0 || $w === 6) {
+// If multi-dates submitted, validate each; otherwise build $dates from range
+if (!empty($dates)) {
+    $validated = [];
+
+    // Check for holiday table existence
+    $holidayTableExists = false;
+    try {
+        $chk = $pdo->prepare("SELECT COUNT(*) as c FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'holidays'");
+        $chk->execute();
+        $row = $chk->fetch(PDO::FETCH_ASSOC);
+        if ($row && (int)$row['c'] > 0) $holidayTableExists = true;
+    } catch (Throwable $e) {
+        $holidayTableExists = false;
+    }
+
+    foreach ($dates as $d) {
+        $d = trim($d);
+        $dtm = DateTime::createFromFormat('Y-m-d', $d);
+        if (!$dtm) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid date in dates array', 'bad_date' => $d]);
+            exit;
+        }
+        $w = (int)$dtm->format('w');
+        if ($w === 0 || $w === 6) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Weekends are not allowed. Please select weekdays only.', 'bad_date' => $d]);
+            exit;
+        }
+        if ($leaveCode === 'VL' && $dtm < $today) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Vacation leave dates cannot be in the past.', 'bad_date' => $d]);
+            exit;
+        }
+
+        if ($holidayTableExists) {
+            try {
+                $hstmt = $pdo->prepare("SELECT 1 FROM holidays WHERE HolidayDate = ? LIMIT 1");
+                $hstmt->execute([$d]);
+                if ($hstmt->fetch()) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Selected date falls on a holiday and cannot be filed.', 'bad_date' => $d]);
+                    exit;
+                }
+            } catch (Throwable $e) {
+                // ignore holiday check failures (schema may differ)
+            }
+        }
+
+        $validated[$dtm->format('Y-m-d')] = true;
+    }
+
+    $dates = array_keys($validated);
+    sort($dates);
+    $totalDays = count($dates);
+    $dateFrom = $dates[0];
+    $dateTo = $dates[count($dates)-1];
+
+} else {
+    if ($dt < $df) {
         http_response_code(400);
-        echo json_encode(['error' => 'Weekends are not allowed. Please select weekdays only.', 'bad_date' => $d->format('Y-m-d')]);
+        echo json_encode(['error' => 'Date To cannot be before Date From.']);
         exit;
     }
-    $dates[] = $d->format('Y-m-d');
+
+    // Collect all dates in range and validate weekends
+    $period = new DatePeriod($df, new DateInterval('P1D'), (clone $dt)->modify('+1 day'));
+    $dates = [];
+    foreach ($period as $d) {
+        $w = (int)$d->format('w'); // 0=Sun,6=Sat
+        if ($w === 0 || $w === 6) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Weekends are not allowed. Please select weekdays only.', 'bad_date' => $d->format('Y-m-d')]);
+            exit;
+        }
+        $dates[] = $d->format('Y-m-d');
+    }
+
+    $totalDays = count($dates); // only weekdays
 }
-
-
-$totalDays = count($dates); // only weekdays
 
 $map = [
     'Vacation' => 'VL',
@@ -173,7 +251,8 @@ $leaveId = $repo->createLeave(
     $documentFilename,
     $empInfo,
     $vacSnap,
-    $sickSnap
+    $sickSnap,
+    $dates
 );
 
 if ($leaveId === false) {

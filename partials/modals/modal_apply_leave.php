@@ -32,22 +32,25 @@
               <option value="Emergency">Special Emergency (Calamity) Leave</option>
               <option value="Special Privilege">Special Leave Privilege</option>
               <option value="Study">Study / Examination Leave</option>
-              <option value="LWOP">Leave Without Pay</option>
             </select>
             <small class="text-muted" id="leaveHint"></small>
           </div>
 
-          <!-- DATE RANGE -->
+          <!-- MULTI-DATE SELECTION -->
           <div class="form-row">
-            <div class="form-group col-md-6">
-              <label>Date From</label>
-              <input type="date" class="form-control" name="date_from" id="dateFrom" required>
-              <small class="text-danger d-none" id="dateFromError"></small>
+            <div class="form-group col-md-8">
+              <label>Select Dates</label>
+              <div class="input-group">
+                <input type="date" class="form-control" id="singleDate">
+                <div class="input-group-append">
+                  <button type="button" class="btn btn-outline-secondary" id="addDateBtn">Add</button>
+                </div>
+              </div>
+              <small class="form-text text-muted">Select multiple non-consecutive weekdays. Weekends and holidays are excluded.</small>
             </div>
-            <div class="form-group col-md-6">
-              <label>Date To</label>
-              <input type="date" class="form-control" name="date_to" id="dateTo" required>
-              <small class="text-danger d-none" id="dateToError"></small>
+            <div class="form-group col-md-4">
+              <label>Selected Dates</label>
+              <div id="selectedDatesList" class="border rounded p-2" style="min-height:46px"></div>
             </div>
           </div>
 
@@ -179,10 +182,9 @@ $('#leaveType').on('change', function () {
 
 <script>
 (function ($) {
-  const $from = $('#dateFrom');
-  const $to = $('#dateTo');
-  const $fromErr = $('#dateFromError');
-  const $toErr = $('#dateToError');
+  const $single = $('#singleDate');
+  const $addBtn = $('#addDateBtn');
+  const $list = $('#selectedDatesList');
   const $form = $('#applyLeaveForm');
 
   function todayStr() {
@@ -206,106 +208,57 @@ $('#leaveType').on('change', function () {
   }
 
 
-  // Helper to update min attributes based on leave type
-  function updateDateMins() {
-    const leaveType = $('#leaveType').val();
-    const t = todayStr();
-    if (leaveType === 'Vacation') {
-      $from.attr('min', t); 
-    } else {
-      $from.removeAttr('min'); 
-    }
-    if ($from.val()) {
-      $to.attr('min', $from.val());
-    } else {
-      if (leaveType === 'Vacation') {
-        $to.attr('min', t);
-      } else {
-        $to.removeAttr('min');
-      }
-    }
+  // Helper: manage selected dates list and hidden inputs
+  function clearSelected() {
+    $list.empty();
   }
 
-  // Initialize mins when modal opens
-  $('#applyLeaveModal').on('show.bs.modal', function () {
-    updateDateMins();
-    clearError($from, $fromErr);
-    clearError($to, $toErr);
-  });
+  function addSelectedDate(dateStr) {
+    const id = 'd_' + dateStr.replace(/-/g, '_');
+    if ($list.find('#' + id).length) return false;
+    const $pill = $(
+      `<div id="${id}" class="d-flex align-items-center justify-content-between mb-1" data-date="${dateStr}">\n         <span>${dateStr}</span>\n         <div>\n           <button type="button" class="btn btn-sm btn-danger remove-date-btn">&times;</button>\n           <input type="hidden" name="dates[]" value="${dateStr}">\n         </div>\n       </div>`
+    );
+    $list.append($pill);
+    return true;
+  }
 
-  // Update mins when leave type changes
-  $('#leaveType').on('change', function () {
-    updateDateMins();
-  });
+  function removeSelectedDate(el) {
+    $(el).closest('div[data-date]').remove();
+  }
 
-  $from.on('change', function () {
-    clearError($from, $fromErr);
-    const v = $(this).val();
-    if (!v) {
-      $to.attr('min', todayStr());
-      return;
-    }
-    if (isWeekend(v)) {
-      showError($from, $fromErr, 'Weekends are not allowed. Please choose a weekday.');
-      $(this).val('');
-      $to.attr('min', todayStr());
-      return;
-    }
-    $to.attr('min', v);
-    if ($to.val() && $to.val() < v) {
-      showError($to, $toErr, 'Date To cannot be before Date From.');
-    } else {
-      clearError($to, $toErr);
-    }
-  });
-
-  $to.on('change', function () {
-    clearError($to, $toErr);
-    const v = $(this).val();
+  $addBtn.on('click', function () {
+    const v = $single.val();
+    const t = todayStr();
     if (!v) return;
     if (isWeekend(v)) {
-      showError($to, $toErr, 'Weekends are not allowed. Please choose a weekday.');
-      $(this).val('');
+      Swal.fire('Invalid date', 'Weekends are not allowed. Please choose a weekday.', 'warning');
       return;
     }
-    const fromVal = $from.val() || todayStr();
-    if (v < fromVal) {
-      showError($to, $toErr, 'Date To cannot be before Date From.');
-      $(this).val('');
+    const leaveType = $('#leaveType').val();
+    if (leaveType === 'Vacation' && v < t) {
+      Swal.fire('Invalid date', 'Vacation leave dates cannot be in the past.', 'warning');
+      return;
     }
+    const ok = addSelectedDate(v);
+    if (!ok) {
+      Swal.fire('Duplicate', 'This date is already selected.', 'info');
+      return;
+    }
+    $single.val('');
+  });
+
+  $list.on('click', '.remove-date-btn', function () {
+    removeSelectedDate(this);
   });
 
   $form.on('submit', function (e) {
-    clearError($from, $fromErr);
-    clearError($to, $toErr);
-    let valid = true;
-    const fromVal = $from.val();
-    const toVal = $to.val();
-    const t = todayStr();
-    if (!fromVal) {
-      showError($from, $fromErr, 'Please select Date From.');
-      valid = false;
-    } else if (isWeekend(fromVal)) {
-      showError($from, $fromErr, 'Weekends are not allowed. Please choose a weekday.');
-      valid = false;
-    } else if ($('#leaveType').val() === 'Vacation' && fromVal < t) {
-      showError($from, $fromErr, 'Date From cannot be in the past for Vacation Leave.');
-      valid = false;
-    }
-    if (!toVal) {
-      showError($to, $toErr, 'Please select Date To.');
-      valid = false;
-    } else if (isWeekend(toVal)) {
-      showError($to, $toErr, 'Weekends are not allowed. Please choose a weekday.');
-      valid = false;
-    } else if (toVal < (fromVal || t)) {
-      showError($to, $toErr, 'Date To cannot be before Date From.');
-      valid = false;
-    }
-    if (!valid) {
+    if ($list.find('input[name="dates[]"]').length === 0) {
       e.preventDefault();
+      Swal.fire('No dates', 'Please add at least one date to file leave.', 'warning');
       return false;
     }
+    // server will validate weekdays and holidays
   });
 })(jQuery);
 </script>
@@ -344,9 +297,29 @@ $('#applyLeaveForm').on('submit', function (e) {
       dataType: 'json'
     }).done((resp) => {
       if (resp && resp.success) {
-        Swal.fire('Success', 'Your leave application has been filed.', 'success').then(() => {
+        // Force-close modal (hide + remove backdrop), reset form, then refresh table
+        try {
           $('#applyLeaveModal').modal('hide');
-          location.reload();
+          $('.modal-backdrop').remove();
+        } catch (e) {}
+        try {
+          // reset the form so subsequent opens are clean
+          form.reset();
+        } catch (e) {}
+
+        // trigger refresh event and call global refresh if available; fallback to reload
+        try { $(document).trigger('leave:refresh'); } catch (e) {}
+        try {
+          if (typeof window.leaveRefresh === 'function') {
+            window.leaveRefresh();
+          }
+        } catch (e) {}
+
+        Swal.fire('Success', 'Your leave application has been filed.', 'success').then(() => {
+          // if refresh didn't run, reload as last resort
+          setTimeout(function () {
+            if (!window.leaveRefresh) location.reload();
+          }, 600);
         });
       } else {
         const msg = resp?.error || 'Failed to create leave.';

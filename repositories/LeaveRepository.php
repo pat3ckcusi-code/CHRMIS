@@ -79,7 +79,8 @@ class LeaveRepository {
         ?string $documentFilename = null,
         array $employeeInfo = [],
         float $vacationCreditsSnapshot = 0.0,
-        float $sickCreditsSnapshot = 0.0
+        float $sickCreditsSnapshot = 0.0,
+        ?array $dates = null
     ): int {
 
         $referenceNo = sprintf(
@@ -169,19 +170,51 @@ class LeaveRepository {
             error_log('[leave][approvingdates] ' . $e->getMessage());
         }
 
-        /* ---- leave_dates (weekdays only) ---- */
-        $start  = new DateTime($dateFrom);
-        $end    = (new DateTime($dateTo))->modify('+1 day');
-        $period = new DatePeriod($start, new DateInterval('P1D'), $end);
+        /* ---- leave_dates insertion ---- */
+        // Determine which dates to insert: explicit $dates (preferred) or date range fallback
+        $datesToInsert = [];
+        if (!empty($dates) && is_array($dates)) {
+            foreach ($dates as $d) {
+                $dt = DateTime::createFromFormat('Y-m-d', $d);
+                if (!$dt) continue;
+                $w = (int)$dt->format('w');
+                if ($w === 0 || $w === 6) continue; // skip weekends
+                $datesToInsert[$dt->format('Y-m-d')] = true;
+            }
+            $datesToInsert = array_keys($datesToInsert);
+            sort($datesToInsert);
+        } else {
+            $start  = new DateTime($dateFrom);
+            $end    = (new DateTime($dateTo))->modify('+1 day');
+            $period = new DatePeriod($start, new DateInterval('P1D'), $end);
+            foreach ($period as $dt) {
+                $day = (int)$dt->format('w'); // 0=Sun,6=Sat
+                if ($day === 0 || $day === 6) continue;
+                $datesToInsert[] = $dt->format('Y-m-d');
+            }
+        }
 
-        $ins = $this->pdo->prepare(
-            "INSERT INTO leave_dates (LeaveID, LeaveDate) VALUES (?, ?)"
+        // Check if extended audit columns exist
+        $colStmt = $this->pdo->prepare(
+            "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leave_dates'"
         );
+        $colStmt->execute();
+        $cols = array_map(function($r){ return $r['COLUMN_NAME']; }, $colStmt->fetchAll(PDO::FETCH_ASSOC));
 
-        foreach ($period as $dt) {
-            $day = (int)$dt->format('w'); // 0=Sun,6=Sat
-            if ($day === 0 || $day === 6) continue;
-            $ins->execute([$leaveId, $dt->format('Y-m-d')]);
+        $useExtended = in_array('IsCancelled', $cols, true) && in_array('CancelledBy', $cols, true);
+
+        if ($useExtended) {
+            $ins = $this->pdo->prepare(
+                "INSERT INTO leave_dates (LeaveID, LeaveDate, IsCancelled, CancelledBy, CancelReason, CancelledAt) VALUES (?, ?, 0, NULL, NULL, NULL)"
+            );
+        } else {
+            $ins = $this->pdo->prepare(
+                "INSERT INTO leave_dates (LeaveID, LeaveDate) VALUES (?, ?)"
+            );
+        }
+
+        foreach ($datesToInsert as $d) {
+            $ins->execute([$leaveId, $d]);
         }
 
         return $leaveId;

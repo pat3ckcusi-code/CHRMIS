@@ -191,12 +191,20 @@ switch($method) {
           $deductFromVL = true;
         }
         if ($column) {
-          // Calculate number of days (inclusive)
-          $days = 1;
-          if ($dateFrom && $dateTo) {
-            $start = new DateTime($dateFrom);
-            $end = new DateTime($dateTo);
-            $days = $start->diff($end)->days + 1;
+          // Calculate number of days based on actual leave_dates rows (exclude cancelled)
+          try {
+            $cntStmt = $pdo->prepare("SELECT COUNT(*) AS c FROM leave_dates WHERE LeaveID = ? AND (IsCancelled = 0 OR IsCancelled IS NULL)");
+            $cntStmt->execute([$leaveId]);
+            $cntRow = $cntStmt->fetch(PDO::FETCH_ASSOC);
+            $days = (int)($cntRow['c'] ?? 0);
+          } catch (Throwable $e) {
+            // Fallback to date range inclusive
+            $days = 1;
+            if ($dateFrom && $dateTo) {
+              $start = new DateTime($dateFrom);
+              $end = new DateTime($dateTo);
+              $days = $start->diff($end)->days + 1;
+            }
           }
           // Deduct from leavecredits (VL if fallback, else normal)
           $sqlDeduct = "UPDATE leavecredits SET $column = GREATEST($column - ?, 0) WHERE EmpNo = ?";
