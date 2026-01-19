@@ -5,7 +5,7 @@ $displayMonth = isset($_GET['month']) && (int)$_GET['month'] > 0 ? (int)$_GET['m
 $displayYear  = isset($_GET['year']) && (int)$_GET['year'] > 0 ? (int)$_GET['year'] : (int)date('Y');
 
 // API path (root-relative to CHRMIS). Adjust if your app is mounted elsewhere.
-$apiUrl = '/CHRMIS/api/get_employee_statistics.php';
+$apiUrl = '../api/get_employee_statistics.php';
 ?>
 
 <!-- Content Header -->
