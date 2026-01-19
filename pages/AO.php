@@ -144,9 +144,8 @@ include_once('../partials/footer.php');
 ?>
 <!-- Using global SweetAlert2 and jQuery loaded in partials/core_javascript.php -->
  <!-- jQuery AJAX to load tabs with caching -->
- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).ready(function() {
        
