@@ -261,7 +261,7 @@ $(document).on('click', '.usage-link', function(e){
         const month = $(this).data('month') || window._stats_current_month || <?= (int)$displayMonth ?>;
         const year  = $(this).data('year')  || window._stats_current_year  || <?= (int)$displayYear ?>;
 
-        const url = '/CHRMIS/api/get_employee_usage_details.php';
+        const url = '../api/get_employee_usage_details.php';
         $.getJSON(url, { empNo: empNo, type: type, month: month, year: year })
                 .done(function(resp){
                         if (!resp || !resp.success) {

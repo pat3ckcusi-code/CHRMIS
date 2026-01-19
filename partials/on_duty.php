@@ -37,7 +37,7 @@ try {
                                 ELSE CONCAT(' ', i.Extension)
                             END
                         )) AS name,
-                        MAX(v.Position) AS position
+                        (SELECT v2.Position FROM v v2 WHERE v2.EmpNo = i.EmpNo AND v2.IndateTo = '0000-00-00' LIMIT 1) AS position
                     FROM i
                     LEFT JOIN v ON v.EmpNo = i.EmpNo
                     WHERE i.Dept IN ($placeholders)
