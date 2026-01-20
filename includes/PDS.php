@@ -110,7 +110,7 @@ try {
     foreach ($rowsChildren as $child) {
         if ($rowIdx > 50) break;
         $sheet->setCellValue("I{$rowIdx}", $child['ChildName'] ?? '')
-              ->setCellValue("M{$rowIdx}", date('m/d/Y', strtotime($child['ChildBirth'])) ?? '');
+              ->setCellValue("M{$rowIdx}", date('d/m/Y', strtotime($child['ChildBirth'])) ?? '');
         $rowIdx++;
     }
 
