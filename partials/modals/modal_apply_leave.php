@@ -13,7 +13,7 @@
       </div>
 
       <!-- FORM -->
-      <form id="applyLeaveForm" method="POST" action="/CHRMIS/api/leave/apply.php" enctype="multipart/form-data">
+      <form id="applyLeaveForm" method="POST" action="../api/leave/apply.php" enctype="multipart/form-data">
         <div class="modal-body">
 
           <!-- LEAVE TYPE -->
@@ -112,7 +112,7 @@ $('#leaveType').on('change', function () {
       $('#docUpload').removeClass('d-none');
       $('#docHint').text('Medical certificate / hospital record');
       // Check sick leave balance
-      $.getJSON('/CHRMIS/api/leave/balance.php', function(bal) {
+      $.getJSON('../api/leave/balance.php', function(bal) {
         if (bal && (bal.sick === 0 || bal.sick === "0")) {
           $('#slToVlWarning').removeClass('d-none').text('You have no available Sick Leave credits. Filing Sick Leave will be deducted from your Vacation Leave balance.');
         }
