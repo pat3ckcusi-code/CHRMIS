@@ -122,4 +122,4 @@ include '../partials/modals/modal_apply_leave.php';
   </div>
 </div>
 
-<script src="/CHRMIS/dist/js/leave.js"></script>
+<script src="../dist/js/leave.js"></script>
