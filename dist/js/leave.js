@@ -4,7 +4,7 @@ $(document).ready(function () {
   loadLeaves();
 
   function loadBalances() {
-    $.getJSON('/CHRMIS/api/leave/balance.php', function (data) {
+    $.getJSON('../api/leave/balance.php', function (data) {
       console.log('Leave balance API response:', data);
       // Defensive: fallback to 0 if missing or not a number
       var vacation = (typeof data.vacation === 'number' && !isNaN(data.vacation)) ? data.vacation : 0;
@@ -32,7 +32,7 @@ $(document).ready(function () {
   }
 
   function loadLeaves() {
-    $.getJSON('/CHRMIS/api/leave/index.php', function (rows) {
+    $.getJSON('../api/leave/index.php', function (rows) {
       let html = '';
 
       if (!rows || rows.length === 0) {
@@ -49,7 +49,7 @@ $(document).ready(function () {
           
           let actionHtml = '';
           if (row.can_print) {
-            actionHtml = `<a href="/CHRMIS/pdf_viewer_leave.php?id=${row.LeaveID}" target="_blank" class="btn btn-sm btn-primary mr-1"><i class="fas fa-print"></i></a>`;
+            actionHtml = `<a href="../pdf_viewer_leave.php?id=${row.LeaveID}" target="_blank" class="btn btn-sm btn-primary mr-1"><i class="fas fa-print"></i></a>`;
           }
           if (row.can_cancel) {
             actionHtml += (row.can_print ? ' ' : '') + `<button class="btn btn-sm btn-danger cancel-btn" data-id="${row.LeaveID}"><i class="fas fa-times"></i></button>`;
@@ -99,7 +99,7 @@ $(document).ready(function () {
       confirmButtonText: 'Yes, cancel it!'
     }).then((result) => {
       if (result.isConfirmed) {
-        $.post('/CHRMIS/api/leave/cancel.php', {
+        $.post('../api/leave/cancel.php', {
           leave_id: leaveId
         }, function(response) {
           Swal.fire('Cancelled!', 'Your leave application has been cancelled.', 'success').then(() => loadLeaves());
