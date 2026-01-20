@@ -310,7 +310,7 @@ while($child = $childquery->fetch())
                         <label class="form-check-label" for="male">Male</label>
                         </div>
                         <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="txtSex" id="female" value="MALE" 
+                        <input class="form-check-input" type="radio" name="txtSex" id="female" value="FEMALE" 
                         <?php if($row['Gender']=='FEMALE') echo 'checked'; ?>>        
                         <label class="form-check-label" for="female">Female</label>
                     </div>

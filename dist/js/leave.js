@@ -75,6 +75,17 @@ $(document).ready(function () {
     });
   }
 
+  // Allow other parts of the app to request a refresh after actions (file, cancel, approve)
+  // expose a global function so other scripts can call it directly
+  window.leaveRefresh = function () {
+    try { loadBalances(); } catch (e) { console.warn('leaveRefresh: loadBalances failed', e); }
+    try { loadLeaves(); } catch (e) { console.warn('leaveRefresh: loadLeaves failed', e); }
+  };
+
+  $(document).on('leave:refresh', function () {
+    window.leaveRefresh();
+  });
+
   $(document).on('click', '#filedLeavesTable .cancel-btn', function () {
     const leaveId = $(this).data('id');
 
