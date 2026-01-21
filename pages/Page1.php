@@ -29,11 +29,11 @@ $Elem = $Equery->fetch();
 $Squery=$pdo->query("select * from iii where EmpNo = '" . $_SESSION["EmpID"] . "' AND Level = 'SECONDARY'");
 $Sec = $Squery->fetch();
 $Vquery=$pdo->query("select * from iii where EmpNo = '" . $_SESSION["EmpID"] . "' AND Level = 'VOCATIONAL/TRADE COURSE'");
-$Voc = $Vquery->fetch();
+$VocRows = $Vquery->fetchAll(PDO::FETCH_ASSOC);
 $Cquery=$pdo->query("select * from iii where EmpNo = '" . $_SESSION["EmpID"] . "' AND Level = 'COLLEGE'");
-$Col = $Cquery->fetch();
+$ColRows = $Cquery->fetchAll(PDO::FETCH_ASSOC);
 $Gquery=$pdo->query("select * from iii where EmpNo = '" . $_SESSION["EmpID"] . "' AND Level = 'GRADUATE STUDIES'");
-$Grad = $Gquery->fetch();
+$GradRows = $Gquery->fetchAll(PDO::FETCH_ASSOC);
 
 $query2=$pdo->query("select * from iii where EmpNo = '" . $_SESSION["EmpID"] . "'");
 $_SESSION['row2'] = $query2->rowCount();
@@ -685,84 +685,100 @@ while($child = $childquery->fetch())
                                         <input class="form-control" name="txtSecondHonor" type="text" id="txtHonor2" value="<?php echo (is_array($Sec) && isset($Sec['Honors'])) ? htmlspecialchars($Sec['Honors']) : ''; ?>" />
                                     </td>
                                 </tr>
+                                <?php
+                                // Vocational / Trade Course - render all rows found (or one empty row if none)
+                                if (!empty($VocRows)) {
+                                    foreach ($VocRows as $v) {
+                                ?>
                                 <tr>
-                                    <td class="style2" style="text-align: center;">
-                                        VOCATIONAL/TRADE COURSE
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtVocational" type="text" id="txtVocational" value="<?php echo (is_array($Voc) && isset($Voc['SchoolName'])) ? htmlspecialchars($Voc['SchoolName']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtVocDeg" type="text" id="txtVocDeg" value="<?php echo (is_array($Voc) && isset($Voc['Course'])) ? htmlspecialchars($Voc['Course']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtVocFrom" type="text" id="txtFrom3" value="<?php echo (is_array($Voc) && isset($Voc['PeriodFrom'])) ? htmlspecialchars($Voc['PeriodFrom']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtVocTo" type="text" id="txtTo3" value="<?php echo (is_array($Voc) && isset($Voc['PeriodTo'])) ? htmlspecialchars($Voc['PeriodTo']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtVocUnits" type="text" id="txtUnits3" value="<?php echo (is_array($Voc) && isset($Voc['Units'])) ? htmlspecialchars($Voc['Units']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtVocYearGrad" type="text" id="txtYearGrad3" value="<?php echo (is_array($Voc) && isset($Voc['YearGrad'])) ? htmlspecialchars($Voc['YearGrad']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtVocHonor" type="text" id="txtHonor3" value="<?php echo (is_array($Voc) && isset($Voc['Honors'])) ? htmlspecialchars($Voc['Honors']) : ''; ?>" />
-                                    </td>
-                                </tr>                                
-                                <tr>
-                                    <td class="style2" style="text-align: center;">
-                                        COLLEGE
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtCollege" type="text" id="txtCollege" value="<?php echo (is_array($Col) && isset($Col['SchoolName'])) ? htmlspecialchars($Col['SchoolName']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtCollegeDeg" type="text" id="txtCollegeDeg" value="<?php echo (is_array($Col) && isset($Col['Course'])) ? htmlspecialchars($Col['Course']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtCollegeFrom" type="text" id="txtFrom4" value="<?php echo (is_array($Col) && isset($Col['PeriodFrom'])) ? htmlspecialchars($Col['PeriodFrom']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtCollegeTo" type="text" id="txtTo4" value="<?php echo (is_array($Col) && isset($Col['PeriodTo'])) ? htmlspecialchars($Col['PeriodTo']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtCollegeUnits" type="text" id="txtUnits4" value="<?php echo (is_array($Col) && isset($Col['Units'])) ? htmlspecialchars($Col['Units']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtCollegeYearGrad" type="text" id="txtYearGrad4" value="<?php echo (is_array($Col) && isset($Col['YearGrad'])) ? htmlspecialchars($Col['YearGrad']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtCollegeHonor" type="text" id="txtHonor4" value="<?php echo (is_array($Col) && isset($Col['Honors'])) ? htmlspecialchars($Col['Honors']) : ''; ?>" />
-                                    </td>
+                                    <td class="style2" style="text-align: center;">VOCATIONAL/TRADE COURSE</td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocational[]" type="text" value="<?php echo htmlspecialchars($v['SchoolName']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocDeg[]" type="text" value="<?php echo htmlspecialchars($v['Course']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocFrom[]" type="text" value="<?php echo htmlspecialchars($v['PeriodFrom']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocTo[]" type="text" value="<?php echo htmlspecialchars($v['PeriodTo']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocUnits[]" type="text" value="<?php echo htmlspecialchars($v['Units']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocYearGrad[]" type="text" value="<?php echo htmlspecialchars($v['YearGrad']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocHonor[]" type="text" value="<?php echo htmlspecialchars($v['Honors']); ?>" /></td>
                                 </tr>
+                                <?php
+                                    }
+                                } else {
+                                ?>
                                 <tr>
-                                    <td class="style2" style="text-align: center;">
-                                        GRADUATE STUDIES
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtGradStudies" type="text" id="txtGradStudies" value="<?php echo (is_array($Grad) && isset($Grad['SchoolName'])) ? htmlspecialchars($Grad['SchoolName']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtGradDeg" type="text" id="txtGradDeg" value="<?php echo (is_array($Grad) && isset($Grad['Course'])) ? htmlspecialchars($Grad['Course']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtGradFrom" type="text" id="txtFrom5" value="<?php echo (is_array($Grad) && isset($Grad['PeriodFrom'])) ? htmlspecialchars($Grad['PeriodFrom']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtGradTo" type="text" id="txtTo5" value="<?php echo (is_array($Grad) && isset($Grad['PeriodTo'])) ? htmlspecialchars($Grad['PeriodTo']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtGradUnits" type="text" id="txtUnits5" value="<?php echo (is_array($Grad) && isset($Grad['Units'])) ? htmlspecialchars($Grad['Units']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtGradYearGrad" type="text" id="txtYearGrad5" value="<?php echo (is_array($Grad) && isset($Grad['YearGrad'])) ? htmlspecialchars($Grad['YearGrad']) : ''; ?>" />
-                                    </td>
-                                    <td style="text-align: center">
-                                        <input class="form-control" name="txtGradHonor" type="text" id="txtHonor5" value="<?php echo (is_array($Grad) && isset($Grad['Honors'])) ? htmlspecialchars($Grad['Honors']) : ''; ?>" />
-                                    </td>                                                                        
+                                    <td class="style2" style="text-align: center;">VOCATIONAL/TRADE COURSE</td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocational[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocDeg[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocFrom[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocTo[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocUnits[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocYearGrad[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtVocHonor[]" type="text" value="" /></td>
                                 </tr>
+                                <?php
+                                }
+
+                                // College - render all rows found (or one empty row if none)
+                                if (!empty($ColRows)) {
+                                    foreach ($ColRows as $c) {
+                                ?>
+                                <tr>
+                                    <td class="style2" style="text-align: center;">COLLEGE</td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollege[]" type="text" value="<?php echo htmlspecialchars($c['SchoolName']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeDeg[]" type="text" value="<?php echo htmlspecialchars($c['Course']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeFrom[]" type="text" value="<?php echo htmlspecialchars($c['PeriodFrom']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeTo[]" type="text" value="<?php echo htmlspecialchars($c['PeriodTo']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeUnits[]" type="text" value="<?php echo htmlspecialchars($c['Units']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeYearGrad[]" type="text" value="<?php echo htmlspecialchars($c['YearGrad']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeHonor[]" type="text" value="<?php echo htmlspecialchars($c['Honors']); ?>" /></td>
+                                </tr>
+                                <?php
+                                    }
+                                } else {
+                                ?>
+                                <tr>
+                                    <td class="style2" style="text-align: center;">COLLEGE</td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollege[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeDeg[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeFrom[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeTo[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeUnits[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeYearGrad[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtCollegeHonor[]" type="text" value="" /></td>
+                                </tr>
+                                <?php
+                                }
+
+                                // Graduate Studies - render all rows found (or one empty row if none)
+                                if (!empty($GradRows)) {
+                                    foreach ($GradRows as $g) {
+                                ?>
+                                <tr>
+                                    <td class="style2" style="text-align: center;">GRADUATE STUDIES</td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradStudies[]" type="text" value="<?php echo htmlspecialchars($g['SchoolName']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradDeg[]" type="text" value="<?php echo htmlspecialchars($g['Course']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradFrom[]" type="text" value="<?php echo htmlspecialchars($g['PeriodFrom']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradTo[]" type="text" value="<?php echo htmlspecialchars($g['PeriodTo']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradUnits[]" type="text" value="<?php echo htmlspecialchars($g['Units']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradYearGrad[]" type="text" value="<?php echo htmlspecialchars($g['YearGrad']); ?>" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradHonor[]" type="text" value="<?php echo htmlspecialchars($g['Honors']); ?>" /></td>
+                                </tr>
+                                <?php
+                                    }
+                                } else {
+                                ?>
+                                <tr>
+                                    <td class="style2" style="text-align: center;">GRADUATE STUDIES</td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradStudies[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradDeg[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradFrom[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradTo[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradUnits[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradYearGrad[]" type="text" value="" /></td>
+                                    <td style="text-align: center"><input class="form-control" name="txtGradHonor[]" type="text" value="" /></td>
+                                </tr>
+                                <?php
+                                }
+                                ?>
                                 <tr>
                                     <td colspan="8" style="text-align: center; vertical-align: middle;">
                                         (Continue on separate sheet if necessary)

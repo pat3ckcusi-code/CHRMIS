@@ -1,6 +1,6 @@
 <!-- Educational Background Modal -->
 <form id="addEducationForm" action="../api/add_education.php" method="post">
-  <input type="hidden" name="userID" id="userID" value="<?php echo $currentuserID; ?>" />
+  <input type="hidden" name="userID" id="userID" value="<?php echo $_SESSION['EmpID'] ?? ''; ?>" />
 
   <div class="modal fade" id="addEducation" tabindex="-1" role="dialog" aria-labelledby="addEducationLabel" aria-hidden="true">
     <div class="modal-dialog modal-md" role="document">
@@ -13,6 +13,7 @@
         </div>
 
         <div class="modal-body">
+          <div id="eduAlert"></div>
           <div class="form-group row">
             <div class="col-12 text-right text-danger">
               <label><i>* Denotes Required Field</i></label>
@@ -23,8 +24,8 @@
             <label for="level">Level of Education*</label>
             <select class="form-control" id="level" name="level" required>
               <option value="">-- Select level --</option>
-              <option>Elementary</option>
-              <option>Secondary</option>
+              <!-- <option>Elementary</option>
+              <option>Secondary</option> -->
               <option>Vocational/Trade Course</option>
               <option>College</option>
               <option>Graduate Studies</option>
@@ -76,3 +77,58 @@
     </div>
   </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const form = document.getElementById('addEducationForm');
+  const alertContainer = document.getElementById('eduAlert');
+
+  function showSweet(type, title, message) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        icon: type,
+        title: title,
+        text: message,
+        timer: type === 'success' ? 1200 : undefined,
+        showConfirmButton: type === 'success' ? false : true
+      });
+    } else {
+      alertContainer.innerHTML = '<div class="alert alert-' + (type === 'success' ? 'success' : 'danger') + ' alert-dismissible" role="alert">'
+        + message
+        + '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'
+        + '<span aria-hidden="true">&times;</span></button></div>';
+    }
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    const fd = new FormData(form);
+
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd
+    }).then(res => res.json())
+      .then(data => {
+        if (data && data.success) {
+          showSweet('success', 'Saved', data.message || 'Saved successfully');
+          form.reset();
+          setTimeout(()=>{
+            // hide modal
+            $('#addEducation').modal('hide');
+            alertContainer.innerHTML = '';
+          }, 1200);
+        } else {
+          showSweet('error', 'Error', (data && data.message) ? data.message : 'An error occurred');
+        }
+      }).catch(err => {
+        showSweet('error', 'Server error', 'Server error');
+      }).finally(()=>{
+        submitBtn.disabled = false;
+      });
+  });
+});
+</script>

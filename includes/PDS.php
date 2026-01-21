@@ -26,6 +26,11 @@ try {
 
     $spreadsheet = IOFactory::load($templatePath);
 
+    // Keep an untouched copy of the original template's first sheet
+    // to use as the base for continuation sheets so populated
+    // personal/family data isn't copied into continuations.
+    $templateFirstSheet = clone $spreadsheet->getSheet(0);
+
     /* ------------------------------------------------------------------
      * PAGE 1: Personal Info + Family + Education
      * ------------------------------------------------------------------ */
@@ -114,16 +119,110 @@ try {
         $rowIdx++;
     }
 
-    $rowIdx = 54;
-    foreach ($rowsIII as $rowiii) {
-        $sheet->setCellValue("D{$rowIdx}", $rowiii['SchoolName'] ?? '')
-              ->setCellValue("G{$rowIdx}", $rowiii['Course'] ?? '')
-			  ->setCellValue("J{$rowIdx}" . $Letter, $rowiii['PeriodFrom'])
-			->setCellValue("K{$rowIdx}" . $Letter, $rowiii['PeriodTo'])
-			->setCellValue("L{$rowIdx}" . $Letter, $rowiii['Units'])
-			->setCellValue("M{$rowIdx}" . $Letter, $rowiii['YearGrad'])
-			->setCellValue("N{$rowIdx}" . $Letter, $rowiii['Honors']);
-        $rowIdx++;
+    // Education mapping: template reserves specific rows for the first
+    // Elementary, Secondary, Vocational, College and Graduate entries.
+    // Any additional entries are written to cloned continuation sheets.
+    $levelBaseRow = [
+        'ELEMENTARY' => 54,
+        'SECONDARY' => 55,
+        'VOCATIONAL/TRADE COURSE' => 56,
+        'COLLEGE' => 57,
+        'GRADUATE STUDIES' => 58,
+    ];
+
+    // Group rows by level preserving DB order
+    $grouped = [];
+    foreach ($rowsIII as $r) {
+        $lvl = strtoupper(trim($r['Level'] ?? ''));
+        if (!isset($grouped[$lvl])) $grouped[$lvl] = [];
+        $grouped[$lvl][] = $r;
+    }
+
+    // Write first entry for each level into its reserved row
+    $overflow = [];
+    foreach ($levelBaseRow as $lvl => $baseRow) {
+        if (!empty($grouped[$lvl])) {
+            $first = array_shift($grouped[$lvl]);
+            $sheet->setCellValue('D' . $baseRow, $first['SchoolName'] ?? '')
+                  ->setCellValue('G' . $baseRow, $first['Course'] ?? '')
+                  ->setCellValue('J' . $baseRow, $first['PeriodFrom'] ?? '')
+                  ->setCellValue('K' . $baseRow, $first['PeriodTo'] ?? '')
+                  ->setCellValue('L' . $baseRow, $first['Units'] ?? '')
+                  ->setCellValue('M' . $baseRow, $first['YearGrad'] ?? '')
+                  ->setCellValue('N' . $baseRow, $first['Honors'] ?? '');
+            // any remaining for this level go to overflow (skip Elementary/Secondary)
+            if (!empty($grouped[$lvl])) {
+                if ($lvl !== 'ELEMENTARY' && $lvl !== 'SECONDARY') {
+                    foreach ($grouped[$lvl] as $rem) { $rem['_level'] = $lvl; $overflow[] = $rem; }
+                }
+                // clear grouped entries for this level to avoid duplicate processing later
+                $grouped[$lvl] = [];
+            }
+        } else {
+            // ensure reserved row is blank if no data
+            $sheet->setCellValue('D' . $baseRow, '');
+            $sheet->setCellValue('G' . $baseRow, '');
+            $sheet->setCellValue('J' . $baseRow, '');
+            $sheet->setCellValue('K' . $baseRow, '');
+            $sheet->setCellValue('L' . $baseRow, '');
+            $sheet->setCellValue('M' . $baseRow, '');
+            $sheet->setCellValue('N' . $baseRow, '');
+        }
+    }
+
+    // Any rows in grouped that are for unexpected levels should also overflow
+    foreach ($grouped as $lvl => $rows) {
+        // skip levels already handled above (ELEMENTARY/SECONDARY and base rows)
+        if (isset($levelBaseRow[$lvl])) continue;
+        foreach ($rows as $r) { $r['_level'] = $lvl; $overflow[] = $r; }
+    }
+
+    // Sort overflow by YearGrad (newest first) so recent education appears first
+    usort($overflow, function($a, $b) {
+        $ay = is_numeric($a['YearGrad'] ?? null) ? (int)$a['YearGrad'] : 0;
+        $by = is_numeric($b['YearGrad'] ?? null) ? (int)$b['YearGrad'] : 0;
+        return $by <=> $ay;
+    });
+
+    // Write overflow entries into continuation sheets cloned from the main sheet
+    if (!empty($overflow)) {
+        $startRow = 54; // where education rows start on template clone
+        $rowsPerSheet = 30; // allow 30 entries per continuation sheet
+        $written = 0;
+        $contIndex = 0;
+        while ($written < count($overflow)) {
+            $contIndex++;
+            // clone a clean copy of the template's first sheet (not the populated one)
+            $cloned = clone $templateFirstSheet;
+            $cloned->setTitle('Education (Cont. ' . $contIndex . ')');
+
+            // Clear data area A..N for rows startRow..(startRow+rowsPerSheet-1)
+            // (remove Level labels such as ELEMENTARY/SECONDARY on continuation sheets)
+            for ($r = $startRow; $r < $startRow + $rowsPerSheet; $r++) {
+                foreach (range('A', 'N') as $col) {
+                    $cloned->setCellValue($col . $r, '');
+                }
+            }
+
+            // fill this cloned sheet
+            $toWrite = min($rowsPerSheet, count($overflow) - $written);
+            for ($i = 0; $i < $toWrite; $i++) {
+                $row = $overflow[$written + $i];
+                $rowNum = $startRow + $i;
+                $levelText = strtoupper(trim($row['_level'] ?? $row['Level'] ?? ''));
+                $cloned->setCellValue('A' . $rowNum, $levelText)
+                       ->setCellValue('D' . $rowNum, $row['SchoolName'] ?? '')
+                       ->setCellValue('G' . $rowNum, $row['Course'] ?? '')
+                       ->setCellValue('J' . $rowNum, $row['PeriodFrom'] ?? '')
+                       ->setCellValue('K' . $rowNum, $row['PeriodTo'] ?? '')
+                       ->setCellValue('L' . $rowNum, $row['Units'] ?? '')
+                       ->setCellValue('M' . $rowNum, $row['YearGrad'] ?? '')
+                       ->setCellValue('N' . $rowNum, $row['Honors'] ?? '');
+            }
+
+            $spreadsheet->addSheet($cloned);
+            $written += $toWrite;
+        }
     }
 
     // ------------------------------------------

@@ -95,8 +95,6 @@ try {
 
         ]);
     }
-
-
     // FAMILY BACKGROUND (ii) 
     if ($_SESSION['row11'] > 0) {
         $sqlFamily = "UPDATE ii SET 
@@ -167,6 +165,7 @@ try {
     // === EDUCATIONAL BACKGROUND (iii) ===
     $pdo->prepare("DELETE FROM iii WHERE EmpNo = ?")->execute([$_SESSION['EmpID']]);
 
+    // Fields mapping per level (order: SchoolName, Course, PeriodFrom, PeriodTo, Units, YearGrad, Honors)
     $educationLevels = [
         'ELEMENTARY' => ['txtElem', 'txtElemEduc', 'txtElemFrom', 'txtElemTo', 'txtElemUnits', 'txtElemYearGrad', 'txtElemHonor'],
         'SECONDARY' => ['txtSecondary', 'txtSecondEduc', 'txtSecondFrom', 'txtSecondTo', 'txtSecondUnits', 'txtSecondYearGrad', 'txtSecondHonor'],
@@ -180,9 +179,37 @@ try {
     $stmtEdu = $pdo->prepare($sqlEdu);
 
     foreach ($educationLevels as $level => $fields) {
-        $values = array_map(fn($f) => $_POST[$f] ?? '', $fields);
-        if (!empty($values[0])) { // Only insert if SchoolName is not empty
-            $stmtEdu->execute(array_merge([$_SESSION['EmpID'], $level], $values));
+        $firstField = $fields[0];
+
+        // If the submitted field is an array (multiple rows)
+        if (isset($_POST[$firstField]) && is_array($_POST[$firstField])) {
+            $count = count($_POST[$firstField]);
+            for ($i = 0; $i < $count; $i++) {
+                $school = trim($_POST[$fields[0]][$i] ?? '');
+                if ($school === '') continue; // skip empty rows
+
+                $course   = trim($_POST[$fields[1]][$i] ?? '');
+                $from     = trim($_POST[$fields[2]][$i] ?? '');
+                $to       = trim($_POST[$fields[3]][$i] ?? '');
+                $units    = trim($_POST[$fields[4]][$i] ?? '');
+                $yeargrad = trim($_POST[$fields[5]][$i] ?? '');
+                $honors   = trim($_POST[$fields[6]][$i] ?? '');
+
+                $stmtEdu->execute([$_SESSION['EmpID'], $level, $school, $course, $from, $to, $units, $yeargrad, $honors]);
+            }
+        } else {
+            // Single value (scalar)
+            $school = trim($_POST[$fields[0]] ?? '');
+            if ($school !== '') {
+                $course   = trim($_POST[$fields[1]] ?? '');
+                $from     = trim($_POST[$fields[2]] ?? '');
+                $to       = trim($_POST[$fields[3]] ?? '');
+                $units    = trim($_POST[$fields[4]] ?? '');
+                $yeargrad = trim($_POST[$fields[5]] ?? '');
+                $honors   = trim($_POST[$fields[6]] ?? '');
+
+                $stmtEdu->execute([$_SESSION['EmpID'], $level, $school, $course, $from, $to, $units, $yeargrad, $honors]);
+            }
         }
     }
 
