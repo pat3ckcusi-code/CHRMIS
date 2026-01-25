@@ -13,9 +13,11 @@ $(document).ready(function() {
   function loadRequests() {
     $.get('../api/document_requests_api.php', { action: 'list' }, function(resp) {
       if(resp.status === 'success') {
-        table.clear();
-        resp.data.forEach(r => {
-          if(r.status === 'Rejected' || r.status === 'Completed') return;
+          table.clear();
+          const docTypes = new Set();
+          resp.data.forEach(r => {
+            if(r.status === 'Rejected' || r.status === 'Completed') return;
+            if(r.document_type) docTypes.add(r.document_type);
           const requestedOn = new Date(r.requested_on).toLocaleString('en-US', { hour12: true });
           const fullName = r.Fname
             + (r.Mname ? ' ' + r.Mname : '')
@@ -48,6 +50,14 @@ $(document).ready(function() {
           $(rowNode).attr('data-status', r.status);
           $(rowNode).attr('data-id', r.id);
         });
+        // Populate Document Type filter
+        const $docSel = $('#filterDocType');
+        if ($docSel.length) {
+          $docSel.empty().append($('<option>').val('').text('All types'));
+          Array.from(docTypes).sort().forEach(dt => {
+            $docSel.append($('<option>').val(dt).text(dt));
+          });
+        }
         $('[data-toggle="tooltip"]').tooltip();
       } else {
         Swal.fire('Error', resp.message, 'error');
@@ -56,6 +66,98 @@ $(document).ready(function() {
   }
 
   loadRequests();
+
+  // Status filter: filter DataTable by Status column (index 6)
+  $('#filterStatus').off('change.requestFilter').on('change.requestFilter', function() {
+    const val = $(this).val();
+    if (val) {
+      const esc = $.fn.dataTable.util.escapeRegex(val);
+      table.column(6).search('^' + esc + '$', true, false).draw();
+    } else {
+      table.column(6).search('').draw();
+    }
+  });
+
+  // Document Type filter: filter DataTable by Document Type column (index 3)
+  $('#filterDocType').off('change.docTypeFilter').on('change.docTypeFilter', function() {
+    const val = $(this).val();
+    if (val) {
+      const esc = $.fn.dataTable.util.escapeRegex(val);
+      table.column(3).search('^' + esc + '$', true, false).draw();
+    } else {
+      table.column(3).search('').draw();
+    }
+  });
+
+  // Print report: generate printable HTML from currently visible rows
+  $('#printReportBtn').off('click.print').on('click.print', function() {
+    const title = 'Document Requests Report';
+    const statusFilter = $('#filterStatus').val() || 'All status';
+    const docTypeFilter = $('#filterDocType').val() || 'All types';
+    const now = new Date().toLocaleString();
+
+    // Clone table header
+    const $table = $('#hrRequestsTable').clone();
+    // Remove action column (last) from cloned table for printing
+    $table.find('thead th:last, tbody td:last-child').remove();
+
+    // Build rows from DataTable's current view (only visible rows after filtering/paging)
+    const rows = table.rows({ search: 'applied' }).data();
+    const $printTable = $('<table class="table table-bordered" style="width:100%;border-collapse:collapse;"></table>');
+    // header
+    const $thead = $('<thead></thead>');
+    const $hdrRow = $('<tr></tr>');
+    // include all header cells except the last Action column
+    $('#hrRequestsTable thead th').slice(0, -1).each(function() { $hdrRow.append($('<th></th>').text($(this).text())); });
+    $thead.append($hdrRow);
+    $printTable.append($thead);
+
+    const $tbody = $('<tbody></tbody>');
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const $r = $('<tr></tr>');
+      // take all columns except the last (actions)
+      for (let c = 0; c < row.length - 1; c++) {
+        $r.append($('<td></td>').html(row[c]));
+      }
+      $tbody.append($r);
+    }
+    $printTable.append($tbody);
+
+    const popup = window.open('', '_blank', 'width=1000,height=800');
+    if (!popup) {
+      Swal.fire('Error', 'Popup blocked. Allow popups for this site to print.', 'error');
+      return;
+    }
+
+    const html = `
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, Helvetica, sans-serif; margin: 20px; }
+          h1 { font-size: 18px; margin-bottom: 4px; }
+          .meta { margin-bottom: 12px; font-size: 12px; color:#333; }
+          table { width: 100%; border-collapse: collapse; }
+          table, th, td { border: 1px solid #444; }
+          th, td { padding: 6px; text-align: left; font-size: 12px; }
+          @media print { .no-print { display:none; } }
+        </style>
+      </head>
+      <body>
+        <h1>${title}</h1>
+        <div class="meta">Status: ${statusFilter} &nbsp;&nbsp;|&nbsp;&nbsp; Document Type: ${docTypeFilter} &nbsp;&nbsp;|&nbsp;&nbsp; Generated: ${now}</div>
+        ${$printTable.prop('outerHTML')}
+      </body>
+      </html>
+    `;
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    // Wait a bit for resources to render before printing
+    setTimeout(() => { popup.print(); }, 500);
+  });
 
   function showSuccess(title, message) {
     Swal.fire({

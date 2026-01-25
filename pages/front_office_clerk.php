@@ -49,7 +49,10 @@ if ($Lrow['Dept'] !== 'City Human Resource Management Department') {
             <div class="card">
               <div class="card-header d-flex align-items-center">
                 <h3 class="card-title"><i class="fas fa-list"></i> Request History</h3>
-                <div class="ml-auto">
+                <div class="ml-auto d-flex align-items-center" style="gap:8px;">
+                  <select id="filterDocType" class="form-control form-control-sm">
+                    <option value="">All types</option>
+                  </select>
                   <select id="filterStatus" class="form-control form-control-sm">
                     <option value="">All status</option>
                     <option value="Requested">Requested</option>
@@ -57,6 +60,7 @@ if ($Lrow['Dept'] !== 'City Human Resource Management Department') {
                     <option value="Completed">Completed</option>
                     <option value="Rejected">Rejected</option>
                   </select>
+                  <button id="printReportBtn" class="btn btn-secondary btn-sm" title="Print report"><i class="fas fa-print"></i> Print</button>
                 </div>
               </div>
               <div class="card-body table-responsive p-0">
