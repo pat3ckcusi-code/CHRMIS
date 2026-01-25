@@ -255,6 +255,36 @@ $(document).ready(function() {
       success: function(data) {
         tabCache[tabId] = data;       // cache the content
         $('#tabContent').html(data);  // display content
+
+        // If the loaded content contains the Filed Leaves table, ensure leave.js is loaded
+        if ($('#tabContent').find('#filedLeavesTable').length) {
+          (function ensureDataTablesThenLoadLeave(done){
+            function loadLeave() {
+              $.getScript('../dist/js/leave.js')
+                .done(function(){ console.log('leave.js dynamically loaded (initial)'); if (done) done(); })
+                .fail(function(){ console.warn('Failed to dynamically load leave.js (initial)'); if (done) done(); });
+            }
+
+            if (window.jQuery && ($.fn.DataTable || $.fn.dataTable)) {
+              loadLeave();
+              return;
+            }
+
+            var scripts = [
+              '../plugins/datatables/jquery.dataTables.js',
+              '../plugins/datatables-bs4/js/dataTables.bootstrap4.js',
+              '../plugins/datatables-responsive/js/dataTables.responsive.min.js'
+            ];
+            var i = 0;
+            function next() {
+              if (i >= scripts.length) { loadLeave(); return; }
+              $.getScript(scripts[i])
+                .done(function(){ i++; next(); })
+                .fail(function(){ console.warn('Failed to load ' + scripts[i]); i++; next(); });
+            }
+            next();
+          })();
+        }
       },
       error: function() {
         $('#tabContent').html(`
@@ -283,9 +313,6 @@ $(document).ready(function() {
 
 
 <!-- jQuery AJAX to load tabs with caching -->
- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).ready(function() {
   const tabCache = {}; // Store loaded tab content
@@ -304,6 +331,36 @@ $(document).ready(function() {
       success: function(data) {
         tabCache[tabId] = data;
         $('#tabContent').html(data);
+
+        // If the loaded content contains the Filed Leaves table, ensure leave.js is loaded
+        if ($('#tabContent').find('#filedLeavesTable').length) {
+          (function ensureDataTablesThenLoadLeave(done){
+            function loadLeave() {
+              $.getScript('../dist/js/leave.js')
+                .done(function(){ console.log('leave.js dynamically loaded'); if (done) done(); })
+                .fail(function(){ console.warn('Failed to dynamically load leave.js'); if (done) done(); });
+            }
+
+            if (window.jQuery && ($.fn.DataTable || $.fn.dataTable)) {
+              loadLeave();
+              return;
+            }
+
+            var scripts = [
+              '../plugins/datatables/jquery.dataTables.js',
+              '../plugins/datatables-bs4/js/dataTables.bootstrap4.js',
+              '../plugins/datatables-responsive/js/dataTables.responsive.min.js'
+            ];
+            var i = 0;
+            function next() {
+              if (i >= scripts.length) { loadLeave(); return; }
+              $.getScript(scripts[i])
+                .done(function(){ i++; next(); })
+                .fail(function(){ console.warn('Failed to load ' + scripts[i]); i++; next(); });
+            }
+            next();
+          })();
+        }
       },
       error: function() {
         $('#tabContent').html('<div class="alert alert-danger text-center">Failed to load content.</div>');

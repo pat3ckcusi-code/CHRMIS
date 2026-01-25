@@ -1,5 +1,7 @@
 $(document).ready(function () {
 
+  console.log('leave.js loaded');
+
   loadBalances();
   loadLeaves();
 
@@ -33,12 +35,19 @@ $(document).ready(function () {
 
   function loadLeaves() {
     $.getJSON('../api/leave/index.php', function (rows) {
+      console.log('Leave list API response:', rows);
       let html = '';
 
-      if (!rows || rows.length === 0) {
+      // Normalize rows: accept Array, {data: Array}, or keyed object
+      let items = [];
+      if (Array.isArray(rows)) items = rows;
+      else if (rows && Array.isArray(rows.data)) items = rows.data;
+      else if (rows && typeof rows === 'object') items = Object.values(rows);
+
+      if (!items || items.length === 0) {
         html = '<tr><td colspan="6" class="text-center text-muted">No leaves filed yet.</td></tr>';
       } else {
-        rows.forEach(row => {
+        items.forEach(row => {
           const statusBadge = `<span class="badge badge-${row.status_class || 'secondary'}">${row.Status || row.Remarks || 'Pending'}</span>`;
           
           const formatDate = (dateStr) => {
@@ -61,17 +70,181 @@ $(document).ready(function () {
 
       $('#filedLeavesTable tbody').html(html);
 
-      // If DataTables is available, re-draw it for better UX (safe: destroy previous)
-      if ($.fn.DataTable) {
-        if ($.fn.DataTable.isDataTable('#filedLeavesTable')) {
-          $('#filedLeavesTable').DataTable().destroy();
-        }
-        $('#filedLeavesTable').DataTable({
-          pageLength: 10,
-          ordering: true,
-          columnDefs: [ { orderable: false, targets: 5 } ]
+      // Prepare dataRows for DataTables API (ensures rows show even if DOM parsing fails)
+      var dataRows = [];
+      var monthSet = new Set();
+      if (items && items.length) {
+        items.forEach(row => {
+          const statusBadge = `<span class="badge badge-${row.status_class || 'secondary'}">${row.Status || row.Remarks || 'Pending'}</span>`;
+          const formatDate = (dateStr) => {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+          };
+          let actionHtml = '';
+          if (row.can_print) actionHtml = `<a href="../pdf_viewer_leave.php?id=${row.LeaveID}" target="_blank" class="btn btn-sm btn-primary mr-1"><i class="fas fa-print"></i></a>`;
+          if (row.can_cancel) actionHtml += (row.can_print ? ' ' : '') + `<button class="btn btn-sm btn-danger cancel-btn" data-id="${row.LeaveID}"><i class="fas fa-times"></i></button>`;
+
+          // monthKey derived from DateFrom (YYYY-MM)
+          var monthKey = '';
+          try {
+            if (row.DateFrom) {
+              var d = new Date(row.DateFrom);
+              if (!isNaN(d)) {
+                monthKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                monthSet.add(monthKey);
+              }
+            }
+          } catch (e) { /* ignore */ }
+
+          dataRows.push([formatDate(row.DateFiled), row.LeaveType || '', formatDate(row.DateFrom), formatDate(row.DateTo), statusBadge, actionHtml, monthKey]);
         });
       }
+
+      // populate month filter select with available months
+      try {
+        var $mf = $('#monthFilter');
+        if ($mf.length) {
+          var existing = $mf.find('option').length > 1;
+          if (!existing) {
+            var months = Array.from(monthSet).sort().reverse();
+            months.forEach(mk => {
+              var parts = mk.split('-');
+              var label = new Date(parts[0], parseInt(parts[1],10)-1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+              $mf.append(`<option value="${mk}">${label}</option>`);
+            });
+          } else {
+            // refresh options
+            $mf.find('option:gt(0)').remove();
+            var months = Array.from(monthSet).sort().reverse();
+            months.forEach(mk => {
+              var parts = mk.split('-');
+              var label = new Date(parts[0], parseInt(parts[1],10)-1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+              $mf.append(`<option value="${mk}">${label}</option>`);
+            });
+          }
+        }
+      } catch (e) { console.warn('monthFilter population failed', e); }
+
+      console.log('DOM rows after html set:', $('#filedLeavesTable tbody tr').length);
+
+      // If DataTables is available, re-draw it for better UX (safe: destroy previous)
+      // Try to initialize DataTable; if DataTables assets haven't loaded yet, retry a few times
+      (function initWithRetry() {
+        var attempts = 0;
+        var maxAttempts = 20;
+        var delayMs = 250;
+
+        function init() {
+          if (window.jQuery && $.fn && ($.fn.DataTable || $.fn.dataTable)) {
+              try {
+                var useCapital = !!$.fn.DataTable;
+
+                // Destroy previous instance using the available API
+                if (useCapital) {
+                  if ($.fn.DataTable.isDataTable('#filedLeavesTable')) {
+                    $('#filedLeavesTable').DataTable().clear().destroy();
+                  }
+                } else {
+                  // legacy/dataTable API
+                  if ($.fn.dataTable.isDataTable && $.fn.dataTable.isDataTable('#filedLeavesTable')) {
+                    $('#filedLeavesTable').dataTable().fnClearTable();
+                    $('#filedLeavesTable').dataTable().fnDestroy();
+                  } else if ($.fn.dataTable.fnIsDataTable && $.fn.dataTable.fnIsDataTable('#filedLeavesTable')) {
+                    $('#filedLeavesTable').dataTable().fnClearTable();
+                    $('#filedLeavesTable').dataTable().fnDestroy();
+                  }
+                }
+
+                var opts = {
+                  paging: true,
+                  pageLength: -1,
+                  lengthMenu: [[-1, 10, 25, 50, 100], ['All', 10, 25, 50, 100]],
+                  ordering: true,
+                  responsive: false,
+                  scrollX: true,
+                  autoWidth: false,
+                  dom: '<"row"<"col-sm-6"l><"col-sm-6"f>>rt<"row"<"col-sm-6"i><"col-sm-6"p>>',
+                  language: {
+                    paginate: { previous: '&laquo;', next: '&raquo;' },
+                    emptyTable: 'No leaves filed yet.'
+                  },
+                  columnDefs: [ { orderable: false, targets: 5 } ]
+                };
+
+                // If we have explicit dataRows, prefer initializing DataTable with `data` option
+                if (dataRows && dataRows.length) {
+                  var columns = [
+                    { title: 'Date Filed' },
+                    { title: 'Type' },
+                    { title: 'Date From' },
+                    { title: 'Date To' },
+                    { title: 'Status' },
+                    { title: 'Action', orderable: false },
+                    { title: 'MonthKey', visible: false }
+                  ];
+
+                  var dtOpts = Object.assign({}, opts, { data: dataRows, columns: columns });
+
+                  if (useCapital) {
+                    $('#filedLeavesTable').DataTable(dtOpts);
+                    console.log('filedLeavesTable DataTable initialized with data (DataTable)');
+                  } else {
+                    $('#filedLeavesTable').dataTable(dtOpts);
+                    console.log('filedLeavesTable DataTable initialized with data (dataTable)');
+                  }
+                } else {
+                  if (useCapital) {
+                    $('#filedLeavesTable').DataTable(opts);
+                    console.log('filedLeavesTable DataTable initialized (DataTable)');
+                  } else {
+                    $('#filedLeavesTable').dataTable(opts);
+                    console.log('filedLeavesTable DataTable initialized (dataTable)');
+                  }
+                }
+
+                // Log counts
+                console.log('DOM rows after DataTable init:', $('#filedLeavesTable tbody tr').length);
+                try {
+                  var api = useCapital ? $('#filedLeavesTable').DataTable() : $('#filedLeavesTable').dataTable().api();
+                  console.log('DataTable rows count (API):', api.rows().count());
+
+                  // Setup month filtering via DataTables custom filter
+                  // Reset ext.search to avoid duplicates
+                  $.fn.dataTable.ext.search = [];
+                  $.fn.dataTable.ext.search.push(function(settings, data, dataIndex, rowData, counter) {
+                    var selected = $('#monthFilter').val() || '';
+                    if (!selected) return true;
+                    // rowData has MonthKey at index 6 when using `data` option
+                    var mk = '';
+                    try { mk = rowData[6] || ''; } catch (e) { mk = ''; }
+                    return selected === mk;
+                  });
+
+                  // redraw on filter change
+                  $('#monthFilter').off('change.leave').on('change.leave', function(){
+                    try { api.draw(); } catch(e){ console.warn('draw failed', e); }
+                  });
+
+                } catch (e) {
+                  console.warn('Could not read DataTable API rows count', e);
+                }
+              } catch (e) {
+                console.error('DataTable init error:', e);
+              }
+              return;
+            }
+
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(init, delayMs);
+          } else {
+            console.warn('DataTables plugin not found after retries; table will remain plain HTML.');
+          }
+        }
+
+        init();
+      })();
     });
   }
 

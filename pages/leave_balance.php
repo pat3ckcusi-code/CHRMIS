@@ -73,6 +73,11 @@ include '../partials/modals/modal_apply_leave.php';
         </h3>
       </div>
       <div class="card-body">
+        <div class="mb-2">
+          <select id="monthFilter" class="form-control form-control-sm" style="width: 220px; display: inline-block;">
+            <option value="">All Months</option>
+          </select>
+        </div>
         <table id="filedLeavesTable" class="table table-bordered table-striped">
           <thead>
             <tr>
