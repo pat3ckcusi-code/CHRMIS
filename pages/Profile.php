@@ -261,8 +261,8 @@ $(document).ready(function() {
           (function ensureDataTablesThenLoadLeave(done){
             function loadLeave() {
               $.getScript('../dist/js/leave.js')
-                .done(function(){ console.log('leave.js dynamically loaded (initial)'); if (done) done(); })
-                .fail(function(){ console.warn('Failed to dynamically load leave.js (initial)'); if (done) done(); });
+                .done(function(){ if (done) done(); })
+                .fail(function(){ if (done) done(); });
             }
 
             if (window.jQuery && ($.fn.DataTable || $.fn.dataTable)) {
@@ -280,7 +280,7 @@ $(document).ready(function() {
               if (i >= scripts.length) { loadLeave(); return; }
               $.getScript(scripts[i])
                 .done(function(){ i++; next(); })
-                .fail(function(){ console.warn('Failed to load ' + scripts[i]); i++; next(); });
+                .fail(function(){ i++; next(); });
             }
             next();
           })();
@@ -337,8 +337,8 @@ $(document).ready(function() {
           (function ensureDataTablesThenLoadLeave(done){
             function loadLeave() {
               $.getScript('../dist/js/leave.js')
-                .done(function(){ console.log('leave.js dynamically loaded'); if (done) done(); })
-                .fail(function(){ console.warn('Failed to dynamically load leave.js'); if (done) done(); });
+                .done(function(){ if (done) done(); })
+                .fail(function(){ if (done) done(); });
             }
 
             if (window.jQuery && ($.fn.DataTable || $.fn.dataTable)) {
@@ -356,7 +356,7 @@ $(document).ready(function() {
               if (i >= scripts.length) { loadLeave(); return; }
               $.getScript(scripts[i])
                 .done(function(){ i++; next(); })
-                .fail(function(){ console.warn('Failed to load ' + scripts[i]); i++; next(); });
+                .fail(function(){ i++; next(); });
             }
             next();
           })();
