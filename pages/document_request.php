@@ -127,75 +127,89 @@ if(!isset($_SESSION['EmpID'])){
 </section>
 
 <script>
-  // Character counter for textarea
-  const purpose = document.getElementById('purpose');
-  const charCount = document.getElementById('charCount');
+  (function() {
+    // Character counter for textarea (scoped)
+    const purposeEl = document.getElementById('purpose');
+    const charCount = document.getElementById('charCount');
 
-  purpose.addEventListener('input', () => {
-    charCount.textContent = `${purpose.value.length} / 300`;
-  });
+    if (purposeEl && charCount) {
+      purposeEl.addEventListener('input', () => {
+        charCount.textContent = `${purposeEl.value.length} / 300`;
+      });
+    }
+  })();
 </script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-document.getElementById('submitRequest').addEventListener('click', function() {
-    const docType = document.getElementById('docType').value;
-    const purpose = document.getElementById('purpose').value.trim();
+  (function() {
+    // Submit handler (scoped)
+    const submitBtn = document.getElementById('submitRequest');
+    if (!submitBtn) return;
 
-    // Basic client-side validation
-    if(!docType || !purpose) {
+    submitBtn.addEventListener('click', function() {
+      const docTypeEl = document.getElementById('docType');
+      const purposeEl = document.getElementById('purpose');
+      const docType = docTypeEl ? docTypeEl.value : '';
+      const purpose = purposeEl ? purposeEl.value.trim() : '';
+
+      // Basic client-side validation
+      if(!docType || !purpose) {
         Swal.fire({
-            icon: 'warning',
-            title: 'Missing Fields',
-            text: 'Please select a document type and enter the purpose.',
+          icon: 'warning',
+          title: 'Missing Fields',
+          text: 'Please select a document type and enter the purpose.',
         });
         return;
-    }
+      }
 
-    // Disable button while submitting
-    this.disabled = true;
+      // Disable button while submitting
+      this.disabled = true;
 
-    // Send data via AJAX
-    fetch('../includes/process_document_request.php', {
+      // Send data via AJAX
+      fetch('../includes/process_document_request.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-            docType: docType,
-            purpose: purpose,
+          docType: docType,
+          purpose: purpose,
         })
-    })
-    .then(response => response.json())
-    .then(data => {
+      })
+      .then(response => response.json())
+      .then(data => {
         if(data.status === 'success') {
-            Swal.fire({
-                icon: 'success',
-                title: 'Request Submitted',
-                text: data.message,
-            }).then(() => {
-                // Reset form
-                document.getElementById('documentRequestForm').reset();
-                document.getElementById('charCount').textContent = '0 / 300';
-            });
+          Swal.fire({
+            icon: 'success',
+            title: 'Request Submitted',
+            text: data.message,
+          }).then(() => {
+            // Reset form
+            const form = document.getElementById('documentRequestForm');
+            if (form) form.reset();
+            const charCount = document.getElementById('charCount');
+            if (charCount) charCount.textContent = '0 / 300';
+          });
         } else {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: data.message,
-            });
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: data.message,
+          });
         }
-    })
-    .catch(err => {
+      })
+      .catch(err => {
         console.error(err);
         Swal.fire({
-            icon: 'error',
-            title: 'Request Failed',
-            text: 'Something went wrong. Please try again later.',
+          icon: 'error',
+          title: 'Request Failed',
+          text: 'Something went wrong. Please try again later.',
         });
-    })
-    .finally(() => {
+      })
+      .finally(() => {
         this.disabled = false;
+      });
     });
-});
+  })();
 </script>
 
 
