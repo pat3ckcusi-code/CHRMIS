@@ -143,7 +143,7 @@ date_default_timezone_set('Asia/Manila');
                                     </thead>
                                     <tbody>
                                         <?php 
-                                        $query1 = $pdo->query("SELECT * FROM v WHERE EmpNo = '" . $_SESSION['EmpID'] . "'");
+                                        $query1 = $pdo->query("SELECT * FROM v WHERE EmpNo = '" . $_SESSION['EmpID'] . "' ORDER BY IndateFrom DESC");
                                         if($query1->rowCount() == 0) {
                                         ?>
                                         <tr>
