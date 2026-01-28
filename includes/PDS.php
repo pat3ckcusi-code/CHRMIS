@@ -121,7 +121,8 @@ try {
 
     // Education mapping: template reserves specific rows for the first
     // Elementary, Secondary, Vocational, College and Graduate entries.
-    // Any additional entries are written to cloned continuation sheets.
+    // If there are additional records for a given Level, insert rows
+    // below the reserved row and merge column A across those rows.
     $levelBaseRow = [
         'ELEMENTARY' => 54,
         'SECONDARY' => 55,
@@ -138,91 +139,183 @@ try {
         $grouped[$lvl][] = $r;
     }
 
-    // Write first entry for each level into its reserved row
-    $overflow = [];
+    // We'll process levels top-to-bottom and track how many rows we've inserted
+    $insertedOffset = 0;
+
+    // helper: unmerge any existing merged ranges that intersect a given target range
+    $unmergeIntersecting = function($worksheet, $targetRange) {
+        $existing = $worksheet->getMergeCells();
+        if (empty($existing)) return;
+        foreach ($existing as $existingRange => $_) {
+            // parse ranges like A1:C3
+            if (strpos($existingRange, ':') === false || strpos($targetRange, ':') === false) continue;
+            list($exStart, $exEnd) = explode(':', $existingRange);
+            list($tStart, $tEnd) = explode(':', $targetRange);
+
+            list($exColStart, $exRowStart) = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::coordinateFromString($exStart);
+            list($exColEnd, $exRowEnd)     = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::coordinateFromString($exEnd);
+            list($tColStart, $tRowStart)   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::coordinateFromString($tStart);
+            list($tColEnd, $tRowEnd)       = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::coordinateFromString($tEnd);
+
+            $exColStartIdx = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($exColStart);
+            $exColEndIdx   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($exColEnd);
+            $tColStartIdx  = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($tColStart);
+            $tColEndIdx    = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($tColEnd);
+
+            $exRowStart = (int)$exRowStart; $exRowEnd = (int)$exRowEnd;
+            $tRowStart = (int)$tRowStart; $tRowEnd = (int)$tRowEnd;
+
+            $colsOverlap = max($exColStartIdx, $tColStartIdx) <= min($exColEndIdx, $tColEndIdx);
+            $rowsOverlap = max($exRowStart, $tRowStart) <= min($exRowEnd, $tRowEnd);
+
+            if ($colsOverlap && $rowsOverlap) {
+                $worksheet->unmergeCells($existingRange);
+            }
+        }
+    };
+
     foreach ($levelBaseRow as $lvl => $baseRow) {
-        if (!empty($grouped[$lvl])) {
-            $first = array_shift($grouped[$lvl]);
-            $sheet->setCellValue('D' . $baseRow, $first['SchoolName'] ?? '')
-                  ->setCellValue('G' . $baseRow, $first['Course'] ?? '')
-                  ->setCellValue('J' . $baseRow, $first['PeriodFrom'] ?? '')
-                  ->setCellValue('K' . $baseRow, $first['PeriodTo'] ?? '')
-                  ->setCellValue('L' . $baseRow, $first['Units'] ?? '')
-                  ->setCellValue('M' . $baseRow, $first['YearGrad'] ?? '')
-                  ->setCellValue('N' . $baseRow, $first['Honors'] ?? '');
-            // any remaining for this level go to overflow (skip Elementary/Secondary)
-            if (!empty($grouped[$lvl])) {
-                if ($lvl !== 'ELEMENTARY' && $lvl !== 'SECONDARY') {
-                    foreach ($grouped[$lvl] as $rem) { $rem['_level'] = $lvl; $overflow[] = $rem; }
-                }
-                // clear grouped entries for this level to avoid duplicate processing later
-                $grouped[$lvl] = [];
+        $rowsForLevel = $grouped[$lvl] ?? [];
+        $count = count($rowsForLevel);
+        $target = $baseRow + $insertedOffset;
+
+        if ($count === 0) {
+            // ensure reserved row is blank
+            $sheet->setCellValue('A' . $target, '')
+                  ->setCellValue('D' . $target, '')
+                  ->setCellValue('G' . $target, '')
+                  ->setCellValue('J' . $target, '')
+                  ->setCellValue('K' . $target, '')
+                  ->setCellValue('L' . $target, '')
+                  ->setCellValue('M' . $target, '')
+                  ->setCellValue('N' . $target, '');
+          } elseif ($count === 1) {
+            // single record: use the reserved row
+            $r = $rowsForLevel[0];
+            $sheet->setCellValue('A' . $target, $lvl)
+                ->setCellValue('D' . $target, $r['SchoolName'] ?? '')
+                ->setCellValue('G' . $target, $r['Course'] ?? '')
+                ->setCellValue('J' . $target, $r['PeriodFrom'] ?? '')
+                ->setCellValue('K' . $target, $r['PeriodTo'] ?? '')
+                ->setCellValue('L' . $target, $r['Units'] ?? '')
+                ->setCellValue('M' . $target, $r['YearGrad'] ?? '')
+                ->setCellValue('N' . $target, $r['Honors'] ?? '');
+
+            // ensure no existing merges intersect this row's D:I range, then merge
+            $mergeRange = "D{$target}:I{$target}";
+            $unmergeIntersecting($sheet, $mergeRange);
+            $sheet->mergeCells("D{$target}:F{$target}");
+            $sheet->mergeCells("G{$target}:I{$target}");
+            $sheet->getStyle("D{$target}:I{$target}")->getAlignment()->setWrapText(true);
+
+            // merge A:C for this row and set formatting
+            $mergeA = "A{$target}:C{$target}";
+            $existingMergesA = $sheet->getMergeCells();
+            if (in_array($mergeA, $existingMergesA, true)) {
+                $sheet->unmergeCells($mergeA);
             }
+            $sheet->mergeCells($mergeA);
+            $sheet->setCellValue('A' . $target, $lvl);
+            $sheet->getStyle($mergeA)->getAlignment()
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
+                ->setWrapText(true);
+            $sheet->getStyle("G{$target}:N{$target}")->getAlignment()->setWrapText(true);
         } else {
-            // ensure reserved row is blank if no data
-            $sheet->setCellValue('D' . $baseRow, '');
-            $sheet->setCellValue('G' . $baseRow, '');
-            $sheet->setCellValue('J' . $baseRow, '');
-            $sheet->setCellValue('K' . $baseRow, '');
-            $sheet->setCellValue('L' . $baseRow, '');
-            $sheet->setCellValue('M' . $baseRow, '');
-            $sheet->setCellValue('N' . $baseRow, '');
+            // multiple records: keep first in reserved row then insert additional rows
+            $first = $rowsForLevel[0];
+            $sheet->setCellValue('D' . $target, $first['SchoolName'] ?? '')
+                  ->setCellValue('G' . $target, $first['Course'] ?? '')
+                  ->setCellValue('J' . $target, $first['PeriodFrom'] ?? '')
+                  ->setCellValue('K' . $target, $first['PeriodTo'] ?? '')
+                  ->setCellValue('L' . $target, $first['Units'] ?? '')
+                  ->setCellValue('M' . $target, $first['YearGrad'] ?? '')
+                  ->setCellValue('N' . $target, $first['Honors'] ?? '');
+
+            // insert additional rows directly below the reserved row
+            $toInsert = $count - 1;
+            $sheet->insertNewRowBefore($target + 1, $toInsert);
+
+            // fill inserted rows
+            for ($i = 1; $i < $count; $i++) {
+                $rowData = $rowsForLevel[$i];
+                $rnum = $target + $i;
+                $sheet->setCellValue('D' . $rnum, $rowData['SchoolName'] ?? '')
+                      ->setCellValue('G' . $rnum, $rowData['Course'] ?? '')
+                      ->setCellValue('J' . $rnum, $rowData['PeriodFrom'] ?? '')
+                      ->setCellValue('K' . $rnum, $rowData['PeriodTo'] ?? '')
+                      ->setCellValue('L' . $rnum, $rowData['Units'] ?? '')
+                      ->setCellValue('M' . $rnum, $rowData['YearGrad'] ?? '')
+                      ->setCellValue('N' . $rnum, $rowData['Honors'] ?? '');
+                // ensure no existing merges intersect this inserted row, then merge D:F and G:I
+                $mergeRangeRow = "D{$rnum}:I{$rnum}";
+                $unmergeIntersecting($sheet, $mergeRangeRow);
+                $sheet->mergeCells("D{$rnum}:F{$rnum}");
+                $sheet->mergeCells("G{$rnum}:I{$rnum}");
+                $sheet->getStyle("D{$rnum}:I{$rnum}")->getAlignment()->setWrapText(true);
+            }
+
+            // merge A:C across reserved + inserted rows for this level
+            $endRow = $target + $toInsert;
+            $mergeArange = "A{$target}:C{$endRow}";
+            $unmergeIntersecting($sheet, $mergeArange);
+            $sheet->mergeCells($mergeArange);
+            $sheet->setCellValue('A' . $target, $lvl);
+            $sheet->getStyle($mergeArange)->getAlignment()
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
+                ->setWrapText(true);
+
+            // enable wrap text for the data area for these rows
+            $sheet->getStyle("D{$target}:N{$endRow}")->getAlignment()->setWrapText(true);
+
+            // ensure no existing merges intersect the reserved row, then merge D:F and G:I for the reserved row
+            $mergeRangeReserved = "D{$target}:I{$target}";
+            $unmergeIntersecting($sheet, $mergeRangeReserved);
+            $sheet->mergeCells("D{$target}:F{$target}");
+            $sheet->mergeCells("G{$target}:I{$target}");
+            $sheet->getStyle("D{$target}:I{$target}")->getAlignment()->setWrapText(true);
+
+            // account for inserted rows when processing subsequent levels
+            $insertedOffset += $toInsert;
         }
+
+        // clear processed entries so later 'unexpected' handling only sees unhandled ones
+        unset($grouped[$lvl]);
     }
 
-    // Any rows in grouped that are for unexpected levels should also overflow
+    // Any remaining grouped entries (unexpected levels) should be appended after the mapped area
+    $lastBase = max($levelBaseRow) + $insertedOffset + 1;
     foreach ($grouped as $lvl => $rows) {
-        // skip levels already handled above (ELEMENTARY/SECONDARY and base rows)
-        if (isset($levelBaseRow[$lvl])) continue;
-        foreach ($rows as $r) { $r['_level'] = $lvl; $overflow[] = $r; }
-    }
+        if (empty($rows)) continue;
+        $count = count($rows);
+        // insert rows for these entries
+        $sheet->insertNewRowBefore($lastBase, $count);
+        $start = $lastBase;
+        $end = $lastBase + $count - 1;
 
-    // Sort overflow by YearGrad (newest first) so recent education appears first
-    usort($overflow, function($a, $b) {
-        $ay = is_numeric($a['YearGrad'] ?? null) ? (int)$a['YearGrad'] : 0;
-        $by = is_numeric($b['YearGrad'] ?? null) ? (int)$b['YearGrad'] : 0;
-        return $by <=> $ay;
-    });
+          // fill rows
+          for ($i = 0; $i < $count; $i++) {
+            $rnum = $start + $i;
+            $rowData = $rows[$i];
+            $sheet->setCellValue('D' . $rnum, $rowData['SchoolName'] ?? '')
+                ->setCellValue('G' . $rnum, $rowData['Course'] ?? '')
+                ->setCellValue('J' . $rnum, $rowData['PeriodFrom'] ?? '')
+                ->setCellValue('K' . $rnum, $rowData['PeriodTo'] ?? '')
+                ->setCellValue('L' . $rnum, $rowData['Units'] ?? '')
+                ->setCellValue('M' . $rnum, $rowData['YearGrad'] ?? '')
+                ->setCellValue('N' . $rnum, $rowData['Honors'] ?? '');
+          }
 
-    // Write overflow entries into continuation sheets cloned from the main sheet
-    if (!empty($overflow)) {
-        $startRow = 54; // where education rows start on template clone
-        $rowsPerSheet = 30; // allow 30 entries per continuation sheet
-        $written = 0;
-        $contIndex = 0;
-        while ($written < count($overflow)) {
-            $contIndex++;
-            // clone a clean copy of the template's first sheet (not the populated one)
-            $cloned = clone $templateFirstSheet;
-            $cloned->setTitle('Education (Cont. ' . $contIndex . ')');
+                    // merge A:C for these appended rows and set level text
+                    $mergeAapp = "A{$start}:C{$end}";
+                    $unmergeIntersecting($sheet, $mergeAapp);
+                    $sheet->mergeCells($mergeAapp);
+                    $sheet->setCellValue('A' . $start, strtoupper(trim($rows[0]['Level'] ?? $lvl)));
+                    $sheet->getStyle($mergeAapp)->getAlignment()
+                            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
+                            ->setWrapText(true);
 
-            // Clear data area A..N for rows startRow..(startRow+rowsPerSheet-1)
-            // (remove Level labels such as ELEMENTARY/SECONDARY on continuation sheets)
-            for ($r = $startRow; $r < $startRow + $rowsPerSheet; $r++) {
-                foreach (range('A', 'N') as $col) {
-                    $cloned->setCellValue($col . $r, '');
-                }
-            }
-
-            // fill this cloned sheet
-            $toWrite = min($rowsPerSheet, count($overflow) - $written);
-            for ($i = 0; $i < $toWrite; $i++) {
-                $row = $overflow[$written + $i];
-                $rowNum = $startRow + $i;
-                $levelText = strtoupper(trim($row['_level'] ?? $row['Level'] ?? ''));
-                $cloned->setCellValue('A' . $rowNum, $levelText)
-                       ->setCellValue('D' . $rowNum, $row['SchoolName'] ?? '')
-                       ->setCellValue('G' . $rowNum, $row['Course'] ?? '')
-                       ->setCellValue('J' . $rowNum, $row['PeriodFrom'] ?? '')
-                       ->setCellValue('K' . $rowNum, $row['PeriodTo'] ?? '')
-                       ->setCellValue('L' . $rowNum, $row['Units'] ?? '')
-                       ->setCellValue('M' . $rowNum, $row['YearGrad'] ?? '')
-                       ->setCellValue('N' . $rowNum, $row['Honors'] ?? '');
-            }
-
-            $spreadsheet->addSheet($cloned);
-            $written += $toWrite;
-        }
+          $sheet->getStyle("D{$start}:N{$end}")->getAlignment()->setWrapText(true);
+        $lastBase = $end + 1;
     }
 
     // ------------------------------------------
