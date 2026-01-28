@@ -22,7 +22,7 @@ if (isset($_SESSION[$session_id])) {
   <!-- icheck bootstrap -->
   <link rel="stylesheet" href="../plugins/icheck-bootstrap/icheck-bootstrap.min.css">
   <!-- SweetAlert2 -->
-  <link rel="stylesheet" href="../plugins/sweetalert2/sweetalert2.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <!-- Theme style -->
   <link rel="stylesheet" href="../dist/css/adminlte.min.css">
   <!-- Google Font: Source Sans Pro -->

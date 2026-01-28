@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../plugins/datatables-buttons/css/buttons.bootstrap4.min.css">
   <link rel="stylesheet" href="../plugins/datatables-responsive/css/responsive.bootstrap4.min.css">
   <!-- SweetAlert2 -->
-  <link rel="stylesheet" href="../plugins/sweetalert2/sweetalert2.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <!-- Select2 -->
   <link rel="stylesheet" href="../plugins/select2/css/select2.min.css">
   <!-- date picker -->

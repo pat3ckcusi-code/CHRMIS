@@ -9,8 +9,8 @@
 <script src="../plugins/datatables-buttons/js/buttons.print.min.js"></script>
 <script src="../plugins/datatables-buttons/js/buttons.html5.min.js"></script>
 <script src="../plugins/datatables-responsive/js/dataTables.responsive.min.js"></script>
-<!-- SweetAlert2 -->
-<script src="../plugins/sweetalert2/sweetalert2.min.js"></script>
+<!-- SweetAlert2 (CDN v11) -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <!-- Select2 -->
 <script src="../plugins/select2/js/select2.full.min.js"></script>
 <!-- Moment -->

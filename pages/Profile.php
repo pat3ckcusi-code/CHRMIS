@@ -201,18 +201,18 @@ $profilePic = !empty($Lrow['profile_pic'])
 <?php
 include_once('../partials/footer.php');
 include("../partials/modals/modalpassword.php");
-
 // change password prompt
 if ($Lrow['Password'] === 'password') {
 ?>
+
 <script>
 window.addEventListener("load", function() {
     Swal.fire({
-        title: "Change Password Required",
-        text: "Please change your password to continue.",
-        icon: "warning",
-        allowOutsideClick: false,
-        allowEscapeKey: false
+      title: "Change Password Required",
+      text: "Please change your password to continue.",
+      icon: "warning",
+      allowOutsideClick: false,
+      allowEscapeKey: false
     }).then((result) => {
         if (result.isConfirmed) {            
             const modalElement = document.getElementById("modalPassword");
@@ -429,7 +429,7 @@ document.addEventListener("DOMContentLoaded", function() {
     })
     .then(() => {
       $("#privacyNoticeModal").modal("hide");
-      Swal.fire({
+        Swal.fire({
         icon: 'success',
         title: 'Accepted',
         text: 'Privacy notice accepted.',
