@@ -192,5 +192,201 @@ function sendLeaveApprovalEmail(
     }
 }
 
+// Send notification to the applicant for ETA/Locator status updates
+function sendETANotificationEmail($toEmail, $toName, $applicationType, $status, $meta = [], $rejectionNote = null)
+{
+    try {
+        $mail = getMailer();
+        $mail->setFrom('no-reply@lgucalapan.ph', 'CHRMIS');
+        $mail->addAddress($toEmail, $toName);
+        $mail->isHTML(true);
+
+        $subjects = [
+            'Pending' => 'Application Received',
+            'Approved' => 'Application Approved',
+            'Rejected' => 'Application Rejected'
+        ];
+
+        $mail->Subject = $subjects[$status] ?? 'Application Update';
+
+        $body = "<p>Dear " . htmlspecialchars($toName) . ",</p>";
+        $body .= "<p>Your " . htmlspecialchars($applicationType) . " application has been <strong>" . htmlspecialchars($status) . "</strong>.</p>";
+
+        if (!empty($meta) && is_array($meta)) {
+            $body .= "<ul>";
+            foreach ($meta as $k => $v) {
+                $body .= "<li><strong>" . htmlspecialchars($k) . ":</strong> " . htmlspecialchars((string)$v) . "</li>";
+            }
+            $body .= "</ul>";
+        }
+
+        if (!empty($rejectionNote)) {
+            $body .= "<h4 style=\"color:#b00020;\">Reason</h4>";
+            $body .= "<div style=\"padding:8px;background:#fff4f4;border-left:4px solid #b00020;\">" . nl2br(htmlspecialchars($rejectionNote)) . "</div>";
+        }
+
+        $body .= "<p>Please check the CHRMIS portal for further details.</p>";
+        $body .= "<br><p><strong>City Human Resource Office</strong></p>";
+
+        $mail->Body = $body;
+        $mail->AltBody = strip_tags($body);
+        $mail->send();
+        return true;
+
+    } catch (Exception $e) {
+        error_log('Mailer Error (ETA to applicant): ' . ($mail->ErrorInfo ?? $e->getMessage()));
+        return false;
+    }
+}
+
+// Notify department head about ETA/Locator update. $app is the row from eta_locator JOIN i
+function notify_department_head_eta(PDO $pdo, array $app, $status, $rejectionNote = null)
+{
+    try {
+        $empNo = $app['EmpNo'] ?? null;
+        if (!$empNo) return false;
+
+        // Get employee department and full name
+        $stmt = $pdo->prepare("SELECT Dept, CONCAT(COALESCE(Fname,''),' ',COALESCE(Lname,'')) AS EmpName FROM i WHERE EmpNo = ? LIMIT 1");
+        $stmt->execute([$empNo]);
+        $emp = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$emp) return false;
+
+        $dept = $emp['Dept'] ?? null;
+        $employeeName = trim($app['Fname'] . ' ' . $app['Lname']) ?: ($emp['EmpName'] ?? 'Employee');
+
+        if (empty($dept)) return false;
+
+        // Get department head
+        $h = $pdo->prepare("SELECT AcctName, Email FROM adminusers WHERE Dept = ? LIMIT 1");
+        $h->execute([$dept]);
+        $head = $h->fetch(PDO::FETCH_ASSOC);
+        if (!$head || empty($head['Email'])) return false;
+
+        $toEmail = $head['Email'];
+        $toName = $head['AcctName'];
+
+        $mail = getMailer();
+        $mail->setFrom('no-reply@lgucalapan.ph', 'CHRMIS');
+        $mail->addAddress($toEmail, $toName);
+        $mail->isHTML(true);
+
+        // Determine application type
+        $appType = $app['application_type'] ?? ($app['application'] ?? 'Request');
+
+        // Subject formatting per examples
+        $upperEmpName = strtoupper($employeeName);
+        if (strtoupper($appType) === 'ETA') {
+            $mail->Subject = "Notification: ETA Request Approved for {$upperEmpName}";
+        } else {
+            $mail->Subject = "Notification: {$appType} Request Approved for {$upperEmpName}";
+        }
+
+        // Greeting uses comma style shown in example
+        $body = "<p>Dear, " . htmlspecialchars(strtoupper($toName)) . ",</p>";
+        $body .= "<p>This is to inform you that the " . htmlspecialchars($appType) . " request for <strong>" . htmlspecialchars($upperEmpName) . "</strong> has been <strong>Approved</strong>. Please find below the travel details for your reference:</p>";
+
+        // Core details
+        $body .= "<p><strong>Destination / Location:</strong> " . htmlspecialchars($app['destination'] ?? ($app['location'] ?? '')) . "</p>";
+
+        if (!empty($app['travel_date'])) {
+            // Use Y-m-d format if original appears as date, else show raw
+            $body .= "<p><strong>Travel Date:</strong> " . htmlspecialchars(date('Y-m-d', strtotime($app['travel_date']))) . "</p>";
+        }
+
+        if (!empty($app['travel_detail'])) {
+            $body .= "<p><strong>Travel Details:</strong> " . htmlspecialchars($app['travel_detail']) . "</p>";
+        } elseif (!empty($app['other_purpose'])) {
+            $body .= "<p><strong>Travel Details:</strong> " . htmlspecialchars($app['other_purpose']) . "</p>";
+        }
+
+        // Locator-specific times
+        if (strtoupper($appType) === 'LOCATOR') {
+            if (!empty($app['intended_departure'])) {
+                $body .= "<p><strong>Time of Departure:</strong> " . date('h:i A', strtotime($app['intended_departure'])) . "</p>";
+            }
+            if (!empty($app['intended_arrival'])) {
+                $body .= "<p><strong>Time of Arrival:</strong> " . date('h:i A', strtotime($app['intended_arrival'])) . "</p>";
+            }
+        }
+
+        if (!empty($rejectionNote)) {
+            $body .= "<h4 style=\"color:#b00020;\">Remarks</h4>";
+            $body .= "<div style=\"padding:8px;background:#fff4f4;border-left:4px solid #b00020;\">" . nl2br(htmlspecialchars($rejectionNote)) . "</div>";
+        }
+
+        $body .= "<p>Please check the CHRMIS portal for further details and any required clarifications.</p>";
+        $body .= "<br><p><strong>City Human Resource Office</strong></p>";
+
+        $mail->Body = $body;
+        $mail->AltBody = strip_tags($body);
+        $mail->send();
+
+        return true;
+
+    } catch (Exception $e) {
+        error_log('Mailer Error (Dept Head ETA): ' . ($mail->ErrorInfo ?? $e->getMessage()));
+        return false;
+    }
+}
+// Send notification to Department Head when an application is approved (Clarification)
+function sendDeptHeadApprovalNotification(PDO $pdo, $dept, $employeeName, $applicationType = '', $details = [], $approvedBy = null)
+{
+    try {
+        $stmt = $pdo->prepare("SELECT AcctName, Email FROM adminusers WHERE Dept = ? LIMIT 1");
+        $stmt->execute([$dept]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row || empty($row['Email'])) {
+            return false;
+        }
+
+        $toEmail = $row['Email'];
+        $toName = $row['AcctName'];
+
+        $mail = getMailer();
+        $mail->setFrom('no-reply@lgucalapan.ph', 'CHRMIS');
+        $mail->addAddress($toEmail, $toName);
+        $mail->isHTML(true);
+
+        $mail->Subject = 'Clarification: Application Approved - ' . $employeeName;
+
+        $body = "<p>Dear " . htmlspecialchars($toName) . ",</p>";
+        $body .= "<p>This is to notify you that the application of <strong>" . htmlspecialchars($employeeName) . "</strong> from your department (<strong>" . htmlspecialchars($dept) . "</strong>) has been <strong>APPROVED</strong>.</p>";
+
+        if (!empty($applicationType)) {
+            $body .= "<p><strong>Application Type:</strong> " . htmlspecialchars($applicationType) . "</p>";
+        }
+
+        if (!empty($details) && is_array($details)) {
+            $body .= "<h4 style=\"margin:10px 0 6px;\">Details</h4><ul>";
+            foreach ($details as $k => $v) {
+                $body .= "<li><strong>" . htmlspecialchars($k) . ":</strong> " . nl2br(htmlspecialchars((string)$v)) . "</li>";
+            }
+            $body .= "</ul>";
+        }
+
+        if (!empty($approvedBy)) {
+            $body .= "<p><strong>Approved by:</strong> " . htmlspecialchars($approvedBy) . "</p>";
+        }
+
+        $body .= "<p>Please check the CHRMIS portal for further details and any required clarifications.</p>";
+        $body .= "<br><p><strong>City Human Resource Office</strong></p>";
+
+        $mail->Body = $body;
+        $mail->AltBody = strip_tags($body);
+
+        $mail->send();
+
+        return true;
+
+    } catch (Exception $e) {
+        error_log('Mailer Error: ' . ($mail->ErrorInfo ?? $e->getMessage()));
+        return false;
+    }
+}
+
+
+
 
 

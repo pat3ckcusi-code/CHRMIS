@@ -291,40 +291,4 @@ $pendingLocator = $stmtLocator->fetchAll(PDO::FETCH_ASSOC);
       }
     });
   });
-
-
-
-
-  // $(document).on('click', '.reject-leave-btn', function() {
-  //   const leaveId = $(this).data('id');
-    
-  //   Swal.fire({
-  //     title: 'Reject Leave Application?',
-  //     text: "This will reject the leave application.",
-  //     icon: 'warning',
-  //     showCancelButton: true,
-  //     confirmButtonColor: '#dc3545',
-  //     cancelButtonColor: '#6c757d',
-  //     confirmButtonText: 'Yes, reject it!'
-  //   }).then((result) => {
-  //     if (result.isConfirmed) {
-  //       $.ajax({
-  //         url: '../api/api_leave.php?reject_leave',
-  //         type: 'POST',
-  //         data: { leave_id: leaveId },
-  //         dataType: 'json',
-  //         success: function(response) {
-  //           if (response.success) {
-  //             Swal.fire('Rejected!', 'Leave application has been rejected.', 'error').then(() => location.reload());
-  //           } else {
-  //             Swal.fire('Error!', response.message || 'Failed to reject leave.', 'error');
-  //           }
-  //         },
-  //         error: function() {
-  //           Swal.fire('Error!', 'Server error occurred.', 'error');
-  //         }
-  //       });
-  //     }
-  //   });
-  // });
 </script>
