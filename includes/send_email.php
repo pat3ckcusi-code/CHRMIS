@@ -213,9 +213,34 @@ function sendETANotificationEmail($toEmail, $toName, $applicationType, $status, 
         $body .= "<p>Your " . htmlspecialchars($applicationType) . " application has been <strong>" . htmlspecialchars($status) . "</strong>.</p>";
 
         if (!empty($meta) && is_array($meta)) {
+            $labelMap = [
+                'destination' => 'Destination / Location',
+                'location' => 'Destination / Location',
+                'travel_date' => 'Travel Date',
+                'date_filed' => 'Date Filed',
+                'travel_detail' => 'Travel Details',
+                'other_purpose' => 'Travel Details',
+                'intended_departure' => 'Time of Departure',
+                'intended_arrival' => 'Time of Arrival',
+                'business_type' => 'Purpose',
+            ];
+
             $body .= "<ul>";
             foreach ($meta as $k => $v) {
-                $body .= "<li><strong>" . htmlspecialchars($k) . ":</strong> " . htmlspecialchars((string)$v) . "</li>";
+                $key = strtolower(trim($k));
+                $label = $labelMap[$key] ?? ucfirst(str_replace('_', ' ', $key));
+
+                $value = $v;
+                // Format dates/times if possible
+                if (strpos($key, 'date') !== false && !empty($v) && strtotime($v) !== false) {
+                    $value = date('Y-m-d', strtotime($v));
+                } elseif (strpos($key, 'departure') !== false || strpos($key, 'arrival') !== false) {
+                    if (!empty($v) && strtotime($v) !== false) {
+                        $value = date('h:i A', strtotime($v));
+                    }
+                }
+
+                $body .= "<li><strong>" . htmlspecialchars($label) . ":</strong> " . htmlspecialchars((string)$value) . "</li>";
             }
             $body .= "</ul>";
         }
@@ -274,17 +299,18 @@ function notify_department_head_eta(PDO $pdo, array $app, $status, $rejectionNot
         // Determine application type
         $appType = $app['application_type'] ?? ($app['application'] ?? 'Request');
 
-        // Subject formatting per examples
+        // Normalize status and subject formatting per examples
         $upperEmpName = strtoupper($employeeName);
+        $statusText = ucfirst(strtolower($status));
         if (strtoupper($appType) === 'ETA') {
-            $mail->Subject = "Notification: ETA Request Approved for {$upperEmpName}";
+            $mail->Subject = "Notification: ETA Request {$statusText} for {$upperEmpName}";
         } else {
-            $mail->Subject = "Notification: {$appType} Request Approved for {$upperEmpName}";
+            $mail->Subject = "Notification: {$appType} Request {$statusText} for {$upperEmpName}";
         }
 
         // Greeting uses comma style shown in example
         $body = "<p>Dear, " . htmlspecialchars(strtoupper($toName)) . ",</p>";
-        $body .= "<p>This is to inform you that the " . htmlspecialchars($appType) . " request for <strong>" . htmlspecialchars($upperEmpName) . "</strong> has been <strong>Approved</strong>. Please find below the travel details for your reference:</p>";
+        $body .= "<p>This is to inform you that the " . htmlspecialchars($appType) . " request for <strong>" . htmlspecialchars($upperEmpName) . "</strong> has been <strong>" . htmlspecialchars($statusText) . "</strong>. Please find below the travel details for your reference:</p>";
 
         // Core details
         $body .= "<p><strong>Destination / Location:</strong> " . htmlspecialchars($app['destination'] ?? ($app['location'] ?? '')) . "</p>";
@@ -292,6 +318,11 @@ function notify_department_head_eta(PDO $pdo, array $app, $status, $rejectionNot
         if (!empty($app['travel_date'])) {
             // Use Y-m-d format if original appears as date, else show raw
             $body .= "<p><strong>Travel Date:</strong> " . htmlspecialchars(date('Y-m-d', strtotime($app['travel_date']))) . "</p>";
+        }
+
+        // Include business type / purpose if available
+        if (!empty($app['business_type'])) {
+            $body .= "<p><strong>Business Type:</strong> " . htmlspecialchars($app['business_type']) . "</p>";
         }
 
         if (!empty($app['travel_detail'])) {
