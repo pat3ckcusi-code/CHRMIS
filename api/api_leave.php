@@ -86,40 +86,6 @@ switch($method) {
         $sqlUpdate = "UPDATE filedleave SET Status = 'Recommended' WHERE LeaveID = ?";
         $stmtUpdate = $pdo->prepare($sqlUpdate);
         $stmtUpdate->execute([$leaveId]);
-
-        // // Deduct leave credits
-        // $leaveTypeMap = [
-        //     'Vacation' => 'VL',
-        //     'Sick' => 'SL',
-        //     'Maternity' => 'ML',
-        //     'Paternity' => 'PL',
-        //     'Adoption' => 'AD',
-        //     'Solo Parent' => 'SPL',
-        //     'VAWC' => 'VAWC',
-        //     'Gynecological' => 'GY',
-        //     'Emergency' => 'EM',
-        //     'Special Privilege' => 'SPP',
-        //     'Study' => 'ST',
-        //     'LWOP' => 'LWOP',
-        // ];
-        // $leaveTypeName = $leaveData['LeaveTypeName'] ?? $leaveData['LeaveType'] ?? null;
-        // $empNo = $leaveData['EmpNo'];
-        // $dateFrom = $leaveData['DateFrom'];
-        // $dateTo = $leaveData['DateTo'];
-        // $column = isset($leaveTypeMap[$leaveTypeName]) ? $leaveTypeMap[$leaveTypeName] : null;
-        // if ($column) {
-        //     // Calculate number of days (inclusive)
-        //     $days = 1;
-        //     if ($dateFrom && $dateTo) {
-        //         $start = new DateTime($dateFrom);
-        //         $end = new DateTime($dateTo);
-        //         $days = $start->diff($end)->days + 1;
-        //     }
-        //     // Deduct from leavecredits
-        //     $sqlDeduct = "UPDATE leavecredits SET $column = GREATEST($column - ?, 0) WHERE EmpNo = ?";
-        //     $stmtDeduct = $pdo->prepare($sqlDeduct);
-        //     $stmtDeduct->execute([$days, $empNo]);
-        // }
         
         // Send approval email
         $employeeName = $leaveData['Fname'] . ' ' . $leaveData['Lname'];

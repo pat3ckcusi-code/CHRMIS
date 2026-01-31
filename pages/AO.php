@@ -13,12 +13,32 @@ date_default_timezone_set('Asia/Manila');
 $Deptquery = $pdo->prepare("SELECT * FROM adminusers WHERE Dept = ?");
 $Deptquery->execute([$_SESSION["Dept"]]);
 $Lrow = $Deptquery->fetch(PDO::FETCH_ASSOC);
+// Compute a safe department display value to avoid warnings when no DB row is returned
+$deptDisplay = $Lrow['Dept'] ?? $_SESSION['Dept'] ?? 'Unknown Department';
 // Determine access level for header: prefer session, then DB, then default
 $access_level = 'Department Head / AO';
-if (isset($_SESSION['access_level']) && !empty($_SESSION['access_level'])) {
+if (!empty($_SESSION['access_level'])) {
   $access_level = $_SESSION['access_level'];
-} elseif (isset($Lrow['access_level']) && !empty($Lrow['access_level'])) {
+} elseif (!empty($Lrow['access_level'] ?? '')) {
   $access_level = $Lrow['access_level'];
+}
+
+// Resolve a department-based logo file (tolerant to spaces/case) and fallback
+$logo_dir = __DIR__ . '/../dist/img/logo/';
+$dept_rel_path = '../dist/img/logo/AdminLTELogo.png';
+if (is_dir($logo_dir)) {
+  $normDept = preg_replace('/[^a-z0-9]/', '', strtolower($deptDisplay));
+  $files = scandir($logo_dir);
+  foreach ($files as $f) {
+    if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), ['png','jpg','jpeg','gif'])) {
+      $base = pathinfo($f, PATHINFO_FILENAME);
+      $normFile = preg_replace('/[^a-z0-9]/', '', strtolower($base));
+      if ($normFile === $normDept) {
+        $dept_rel_path = '../dist/img/logo/' . $f;
+        break;
+      }
+    }
+  }
 }
 ?>
 
@@ -57,8 +77,8 @@ if (isset($_SESSION['access_level']) && !empty($_SESSION['access_level'])) {
           <div class="col-md-3">
             <div class="card card-primary card-outline text-center">
               <div class="card-body box-profile">
-                <img class="profile-user-img img-fluid img-circle" src="../../dist/img/AdminLTELogo.png" alt="User profile picture">
-                <h3 class="profile-username mt-2"><?php echo htmlspecialchars($Lrow['Dept']); ?></h3>
+                <img class="profile-user-img img-fluid img-circle" src="<?php echo htmlspecialchars($dept_rel_path); ?>" alt="User profile picture">
+                <h3 class="profile-username mt-2"><?php echo htmlspecialchars($deptDisplay); ?></h3>
               </div>
             </div>
 
@@ -85,12 +105,12 @@ if (isset($_SESSION['access_level']) && !empty($_SESSION['access_level'])) {
                 </div>
               </div>
 
-              <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-                <div class="small-box bg-warning clickable-card" data-file="../partials/on_leave.php">
+              <!-- <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="small-box bg-warning clickable-card" data-file="../partials/manage_leave_credits.php">
                   <div class="inner"><h3>2</h3><p>On Leave</p></div>
                   <div class="icon"><i class="fas fa-umbrella-beach"></i></div>
                 </div>
-              </div>
+              </div> -->
             
               <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
                   <div class="small-box bg-success clickable-card" data-file="../partials/AO_eta_locator.php">
@@ -113,6 +133,27 @@ if (isset($_SESSION['access_level']) && !empty($_SESSION['access_level'])) {
                 <div class="small-box bg-primary clickable-card" data-file="../partials/employee_statistics.php">
                   <div class="inner"><h3><i class="fas fa-chart-bar"></i></h3><p>Statistics</p></div>
                   <div class="icon"><i class="fas fa-chart-pie"></i></div>
+                </div>
+              </div>
+              
+              <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="small-box bg-indigo clickable-card" data-file="../partials/travel_order.php">
+                  <div class="inner"><h3><i class="fas fa-plane"></i></h3><p>Travel Order</p></div>
+                  <div class="icon"><i class="fas fa-paper-plane"></i></div>
+                </div>
+              </div>
+
+              <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="small-box bg-teal clickable-card" data-file="../partials/travel_orders_list.php">
+                  <div class="inner"><h3><i class="fas fa-list-alt"></i></h3><p>Filed Travel Orders</p></div>
+                  <div class="icon"><i class="fas fa-info-circle"></i></div>
+                </div>
+              </div>
+
+              <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="small-box bg-secondary clickable-card" data-file="../partials/web_logging.php">
+                  <div class="inner"><h3><i class="fas fa-book"></i></h3><p>Web-Based Logging (Manual Entry)</p></div>
+                  <div class="icon"><i class="fas fa-pen"></i></div>
                 </div>
               </div>
             </div>
@@ -190,15 +231,53 @@ $(document).ready(function() {
             cancelButtonText: "Cancel"
         }).then((result) => {
             if (result.isConfirmed) {
-                $.post("../includes/functions/update_status.php", { id: id, status: "Approved" })
-                    .done(function() {
-                        $(".clickable-card.active").trigger("click");
-                        Swal.fire("Approved!", "The application has been approved.", "success");
-                        updateETALocatorCard(); 
-                    })
-                    .fail(function() {
-                        Swal.fire("Error!", "Failed to update the application.", "error");
-                    });
+              const processing = Swal.fire({
+                title: 'Processing...',
+                text: 'Updating status and sending notifications. Please wait.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                  Swal.showLoading();
+                }
+              });
+
+              $.post("../includes/functions/update_status.php", { id: id, status: "Approved" })
+                .done(function(response) {
+                  try { response = typeof response === 'string' ? JSON.parse(response) : response; } catch(e) {}
+                  Swal.close();
+                  $(".clickable-card.active").trigger("click");
+
+                  if (!response || !response.success) {
+                    Swal.fire('Error!', (response && response.message) ? response.message : 'Failed to update the application.', 'error');
+                  } else {
+                    let msg = 'The application has been approved.';
+                    if (response.updated === false) {
+                      Swal.fire('Notice', 'No change was made (record may already be processed).', 'info');
+                    }
+
+                    // Email statuses
+                    const appEmail = response.appEmailSent;
+                    const deptEmail = response.deptEmailSent;
+
+                    if (appEmail === true && deptEmail === true) {
+                      Swal.fire('Approved!', msg + '\nEmails sent to applicant and department head.', 'success');
+                    } else if (appEmail === false && deptEmail === false) {
+                      Swal.fire('Updated', msg + '\nBut email notifications were not sent.', 'warning');
+                    } else if (appEmail === true && deptEmail === false) {
+                      Swal.fire('Updated', msg + '\nApplicant notified, but failed to notify department head.', 'warning');
+                    } else if (appEmail === false && deptEmail === true) {
+                      Swal.fire('Updated', msg + '\nDepartment head notified, but applicant email failed.', 'warning');
+                    } else {
+                      Swal.fire('Updated', msg, 'success');
+                    }
+
+                    updateETALocatorCard();
+                  }
+                })
+                .fail(function() {
+                  Swal.close();
+                  Swal.fire('Error!', 'Server error occurred while processing.', 'error');
+                });
             }
         });
     });
@@ -216,15 +295,52 @@ $(document).ready(function() {
             cancelButtonText: "Cancel"
         }).then((result) => {
             if (result.isConfirmed) {
-                $.post("../includes/functions/update_status.php", { id: id, status: "Rejected" })
-                    .done(function() {
-                        $(".clickable-card.active").trigger("click");
-                        Swal.fire("Rejected!", "The application has been rejected.", "success");
-                        updateETALocatorCard(); 
-                    })
-                    .fail(function() {
-                        Swal.fire("Error!", "Failed to update the application.", "error");
-                    });
+              const processing = Swal.fire({
+                title: 'Processing...',
+                text: 'Updating status and sending notifications. Please wait.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                  Swal.showLoading();
+                }
+              });
+
+              $.post("../includes/functions/update_status.php", { id: id, status: "Rejected" })
+                .done(function(response) {
+                  try { response = typeof response === 'string' ? JSON.parse(response) : response; } catch(e) {}
+                  Swal.close();
+                  $(".clickable-card.active").trigger("click");
+
+                  if (!response || !response.success) {
+                    Swal.fire('Error!', (response && response.message) ? response.message : 'Failed to update the application.', 'error');
+                  } else {
+                    let msg = 'The application has been rejected.';
+                    if (response.updated === false) {
+                      Swal.fire('Notice', 'No change was made (record may already be processed).', 'info');
+                    }
+
+                    const appEmail = response.appEmailSent;
+                    const deptEmail = response.deptEmailSent;
+
+                    if (appEmail === true && deptEmail === true) {
+                      Swal.fire('Rejected!', msg + '\nEmails sent to applicant and department head.', 'success');
+                    } else if (appEmail === false && deptEmail === false) {
+                      Swal.fire('Updated', msg + '\nBut email notifications were not sent.', 'warning');
+                    } else if (appEmail === true && deptEmail === false) {
+                      Swal.fire('Updated', msg + '\nApplicant notified, but failed to notify department head.', 'warning');
+                    } else if (appEmail === false && deptEmail === true) {
+                      Swal.fire('Updated', msg + '\nDepartment head notified, but applicant email failed.', 'warning');
+                    } else {
+                      Swal.fire('Updated', msg, 'success');
+                    }
+
+                    updateETALocatorCard();
+                  }
+                })
+                .fail(function() {
+                  Swal.close();
+                  Swal.fire('Error!', 'Server error occurred while processing.', 'error');
+                });
             }
         });
     });

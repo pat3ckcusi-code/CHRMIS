@@ -249,6 +249,9 @@ $counts = $pdo->query($countsSql)->fetch(PDO::FETCH_ASSOC);
           $('#approvedCountSpan').text('0');
           $('#disapprovedCountSpan').text('0');
           $('#approvalsBadge').text('0');
+          if (typeof window.updatePendingLeavesCount === 'function') {
+            try { window.updatePendingLeavesCount(); } catch(e){ console.error('updatePendingLeavesCount error', e); }
+          }
           if (typeof cb === 'function') cb();
           return;
         }
@@ -270,6 +273,10 @@ $counts = $pdo->query($countsSql)->fetch(PDO::FETCH_ASSOC);
           $('#pendingAlert').html(`<div class="alert alert-info">There are <strong id="pendingAlertCount">${res.pendingCount}</strong> application(s) awaiting mayor approval.</div>`);
         } else {
           $('#pendingAlert').empty();
+        }
+
+        if (typeof window.updatePendingLeavesCount === 'function') {
+          try { window.updatePendingLeavesCount(); } catch(e){ console.error('updatePendingLeavesCount error', e); }
         }
 
         if (typeof cb === 'function') cb();
@@ -363,11 +370,48 @@ $counts = $pdo->query($countsSql)->fetch(PDO::FETCH_ASSOC);
 
       // wire approve/reject with processing feedback
       function refreshApprovalsTable() {
-        // Optionally, you can refetch the table rows via AJAX for more accuracy
-        // For now, just check if table is empty and show a message
         const $tbody = $('table.table tbody');
         if ($tbody.find('tr[id^="leave-row-"]').length === 0) {
           $tbody.html('<tr><td colspan="10" class="text-center text-muted">No applications awaiting mayor approval.</td></tr>');
+        }
+      }
+
+      // Update pending counts and badge in the UI immediately after approve/reject
+      function updatePendingUI(decrementBy) {
+        decrementBy = parseInt(decrementBy) || 1;
+        // approvals badge
+        const $badge = $('#approvalsBadge');
+        let badgeVal = parseInt($badge.text()) || 0;
+        badgeVal = Math.max(0, badgeVal - decrementBy);
+        $badge.text(badgeVal);
+
+        // pending alert count inside the alert box
+        const $pendingAlertCount = $('#pendingAlertCount');
+        if ($pendingAlertCount.length) {
+          let pVal = parseInt($pendingAlertCount.text()) || 0;
+          pVal = Math.max(0, pVal - decrementBy);
+          if (pVal <= 0) {
+            // remove alert entirely
+            $('#pendingAlert').empty();
+          } else {
+            $pendingAlertCount.text(pVal);
+          }
+        }
+
+        // any other span counters used by analysis can be adjusted conservatively
+        const $pendingSpan = $('#pendingCountSpan');
+        if ($pendingSpan.length) {
+          let ps = parseInt($pendingSpan.text()) || 0;
+          ps = Math.max(0, ps - decrementBy);
+          $pendingSpan.text(ps);
+        }
+
+        // also update the small-box card on the main page (Leave Management card)
+        const $mainCard = $('#pendingLeavesCount');
+        if ($mainCard.length) {
+          let mv = parseInt($mainCard.text()) || 0;
+          mv = Math.max(0, mv - decrementBy);
+          $mainCard.text(mv);
         }
       }
 
@@ -402,12 +446,17 @@ $counts = $pdo->query($countsSql)->fetch(PDO::FETCH_ASSOC);
               if (resp && resp.success) {
                 Swal.fire('Approved!', 'Leave application has been approved.', 'success').then(() => {
                   $('#leave-row-' + id).remove();
+                  // immediately update UI counters so user sees change
+                  try { updatePendingUI(1); } catch(e){ console.error('updatePendingUI error', e); }
                   fetchAnalysis(function () {
                     renderUtilizationChart();
                     renderTop5();
                     renderRiskList();
                     renderHeatmap();
                     refreshApprovalsTable();
+                    if (typeof window.updatePendingLeavesCount === 'function') {
+                      try { window.updatePendingLeavesCount(); } catch(e){ console.error('updatePendingLeavesCount error', e); }
+                    }
                   });
                 });
               } else {
@@ -459,12 +508,16 @@ $counts = $pdo->query($countsSql)->fetch(PDO::FETCH_ASSOC);
               if (resp && resp.success) {
                 Swal.fire('Rejected!', 'Leave application has been rejected.', 'success').then(() => {
                   $('#leave-row-' + id).remove();
+                  try { updatePendingUI(1); } catch(e){ console.error('updatePendingUI error', e); }
                   fetchAnalysis(function () {
                     renderUtilizationChart();
                     renderTop5();
                     renderRiskList();
                     renderHeatmap();
                     refreshApprovalsTable();
+                    if (typeof window.updatePendingLeavesCount === 'function') {
+                      try { window.updatePendingLeavesCount(); } catch(e){ console.error('updatePendingLeavesCount error', e); }
+                    }
                   });
                 });
               } else {

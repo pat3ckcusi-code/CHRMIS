@@ -36,9 +36,14 @@ if(isset($_POST['id'], $_POST['status'])) {
                 $toEmail = $app['EMail'] ?? '';
                 $toName = trim(($app['Fname'] ?? '') . ' ' . ($app['Lname'] ?? '')) ?: 'Applicant';
                 $applicationType = $app['application_type'] ?? 'ETA/Locator';
+                // Include additional fields so applicant and dept head emails have complete details
                 $meta = [
                     'destination' => $app['destination'] ?? '',
-                    'travel_date' => $app['travel_date'] ?? $app['date_filed'] ?? ''
+                    'travel_date' => $app['travel_date'] ?? $app['date_filed'] ?? '',
+                    'business_type' => $app['business_type'] ?? '',
+                    'travel_detail' => $app['travel_detail'] ?? $app['other_purpose'] ?? '',
+                    'intended_departure' => $app['intended_departure'] ?? $app['departure_time'] ?? '',
+                    'intended_arrival' => $app['intended_arrival'] ?? $app['arrival_time'] ?? ''
                 ];
 
                 // Determine rejection note from POST (preferred) or from fetched row

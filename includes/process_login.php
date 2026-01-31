@@ -71,7 +71,12 @@ try {
             $redirect = 'LeaveApp.php';
         }elseif ($_SESSION['Status'] === 'Frontline') {
             $redirect = 'front_office_clerk.php';
+        }elseif ($_SESSION['Status'] === 'leave') {
+            $redirect = 'leave_portal.php';
+        }elseif ($_SESSION['Status'] === 'Mayor') {
+            $redirect = 'Workforce.php';
         }
+
 
         echo json_encode([
             'success'  => true,

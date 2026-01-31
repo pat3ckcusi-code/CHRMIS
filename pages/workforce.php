@@ -84,6 +84,17 @@ date_default_timezone_set('Asia/Manila');
           </div>
         </div>
 
+        <!-- ✈️ Travel Orders (Mayor) -->
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+          <div class="small-box bg-teal clickable-card" data-file="../partials/mayor_travel_orders.php">
+            <div class="inner">
+              <h3 id="pendingTOCount">0</h3>
+              <p>Filed Travel Orders</p>
+            </div>
+            <div class="icon"><i class="fas fa-suitcase-rolling"></i></div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Dynamic Content -->
@@ -112,6 +123,10 @@ include_once('../partials/modals/modal_EmpList.php');?>
 
 let charts = {};
 let deptChart;
+let pendingTOPrevCount;
+let pendingTOFirstLoad = true;
+let pendingLeavesPrevCount = 0;
+let pendingLeavesFirstLoad = true;
 
 function bindFilterDept() {
   $('#filterDept').off('change').on('change', function(){
@@ -127,6 +142,8 @@ $('#dynamicContent').load('../partials/workforce_summary.php', function(){
     loadDeptChart();
     initializeCharts();
     updateTotalWorkforce();
+  updatePendingLeavesCount();
+  updatePendingTOCount();
     bindFilterDept();
 });
 
@@ -140,6 +157,80 @@ function updateTotalWorkforce(dept=''){
         $('#totalWorkforce').text(total);
     })
     .catch(err=>console.error("Error updating total workforce:",err));
+}
+
+// Update pending leaves count by loading the mayor_pending partial and reading its badge
+function updatePendingLeavesCount(){
+  fetch('../partials/mayor_pending_approval.php')
+    .then(res => res.text())
+    .then(html => {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const badge = tmp.querySelector('#approvalsBadge');
+      const alertCount = tmp.querySelector('#pendingAlertCount');
+      const raw = (badge && badge.textContent.trim()) || (alertCount && alertCount.textContent.trim()) || '0';
+      const val = parseInt(raw, 10) || 0;
+      const el = document.getElementById('pendingLeavesCount');
+      if (el) el.textContent = val;
+
+      // show toast on first load or when count increases
+      if (pendingLeavesFirstLoad || val > pendingLeavesPrevCount) {
+        if (val > 0 && typeof Swal !== 'undefined') {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            title: `${val} Pending Approval${val > 1 ? 's' : ''}`,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+          });
+        }
+      }
+      pendingLeavesPrevCount = val;
+      pendingLeavesFirstLoad = false;
+    })
+    .catch(err => console.error('Error updating pending leaves count:', err));
+}
+
+// Update pending travel orders count for Mayor dashboard
+function updatePendingTOCount(){
+  fetch('../api/get_travel_orders_mayor.php')
+    .then(res => res.json())
+    .then(rows => {
+      const val = (Array.isArray(rows)) ? rows.length : 0;
+      const el = document.getElementById('pendingTOCount');
+      if (el) el.textContent = val;
+
+      // show toast on first load or when count increases
+      if (pendingTOFirstLoad || val > (pendingTOPrevCount || 0)) {
+        if (val > 0 && typeof Swal !== 'undefined') {
+          const newCount = val - (pendingTOPrevCount || 0);
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            title: `${newCount} Pending Approval${newCount > 1 ? 's' : ''}`,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+          });
+        }
+        // brief visual highlight on the card
+        const card = document.querySelector('.clickable-card[data-file="../partials/mayor_travel_orders.php"]');
+        if (card) {
+          card.classList.add('border-warning');
+          setTimeout(()=>card.classList.remove('border-warning'), 4000);
+        }
+      }
+      pendingTOPrevCount = val;
+      pendingTOFirstLoad = false;
+    })
+    .catch(err => {
+      console.error('Error updating pending travel orders count:', err);
+      const el = document.getElementById('pendingTOCount');
+      if (el) el.textContent = '0';
+    });
 }
 
 document.querySelectorAll('.clickable-card').forEach(card => {
@@ -187,4 +278,8 @@ document.querySelectorAll('.clickable-card').forEach(card => {
     }
   });
 });
+// refresh pending leaves count periodically (every 60s)
+setInterval(updatePendingLeavesCount, 60000);
+// refresh pending travel orders count periodically (every 60s)
+setInterval(updatePendingTOCount, 60000);
 </script>

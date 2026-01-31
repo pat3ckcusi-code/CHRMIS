@@ -1,13 +1,13 @@
 $(document).ready(function () {
 
-  console.log('leave.js loaded');
+  
 
   loadBalances();
   loadLeaves();
 
   function loadBalances() {
     $.getJSON('../api/leave/balance.php', function (data) {
-      console.log('Leave balance API response:', data);
+      
       // Defensive: fallback to 0 if missing or not a number
       var vacation = (typeof data.vacation === 'number' && !isNaN(data.vacation)) ? data.vacation : 0;
       var sick     = (typeof data.sick === 'number' && !isNaN(data.sick)) ? data.sick : 0;
@@ -22,8 +22,7 @@ $(document).ready(function () {
       $('#vlBalance').text(vacation + ' Days');
       $('#asOfDate').text(new Date().toLocaleDateString());
     }).fail(function(jqXHR, textStatus, errorThrown) {
-      // If API fails, show 0 Days and log error
-      console.error('Failed to fetch leave balances:', textStatus, errorThrown);
+      // If API fails, show 0 Days
       $('#vacation').text('0 Days');
       $('#sick').text('0 Days');
       $('#cto').text('0 Days');
@@ -35,7 +34,7 @@ $(document).ready(function () {
 
   function loadLeaves() {
     $.getJSON('../api/leave/index.php', function (rows) {
-      console.log('Leave list API response:', rows);
+      
       let html = '';
 
       // Normalize rows: accept Array, {data: Array}, or keyed object
@@ -124,9 +123,7 @@ $(document).ready(function () {
             });
           }
         }
-      } catch (e) { console.warn('monthFilter population failed', e); }
-
-      console.log('DOM rows after html set:', $('#filedLeavesTable tbody tr').length);
+      } catch (e) { }
 
       // If DataTables is available, re-draw it for better UX (safe: destroy previous)
       // Try to initialize DataTable; if DataTables assets haven't loaded yet, retry a few times
@@ -158,8 +155,8 @@ $(document).ready(function () {
 
                 var opts = {
                   paging: true,
-                  pageLength: -1,
-                  lengthMenu: [[-1, 10, 25, 50, 100], ['All', 10, 25, 50, 100]],
+                  pageLength: 5,
+                  lengthMenu: [[5, 10, 25, 50, 100, -1], [5, 10, 25, 50, 100, 'All']],
                   ordering: true,
                   responsive: false,
                   scrollX: true,
@@ -188,26 +185,19 @@ $(document).ready(function () {
 
                   if (useCapital) {
                     $('#filedLeavesTable').DataTable(dtOpts);
-                    console.log('filedLeavesTable DataTable initialized with data (DataTable)');
                   } else {
                     $('#filedLeavesTable').dataTable(dtOpts);
-                    console.log('filedLeavesTable DataTable initialized with data (dataTable)');
                   }
                 } else {
                   if (useCapital) {
                     $('#filedLeavesTable').DataTable(opts);
-                    console.log('filedLeavesTable DataTable initialized (DataTable)');
                   } else {
                     $('#filedLeavesTable').dataTable(opts);
-                    console.log('filedLeavesTable DataTable initialized (dataTable)');
                   }
                 }
 
-                // Log counts
-                console.log('DOM rows after DataTable init:', $('#filedLeavesTable tbody tr').length);
                 try {
                   var api = useCapital ? $('#filedLeavesTable').DataTable() : $('#filedLeavesTable').dataTable().api();
-                  console.log('DataTable rows count (API):', api.rows().count());
 
                   // Setup month filtering via DataTables custom filter
                   // Reset ext.search to avoid duplicates
@@ -223,14 +213,13 @@ $(document).ready(function () {
 
                   // redraw on filter change
                   $('#monthFilter').off('change.leave').on('change.leave', function(){
-                    try { api.draw(); } catch(e){ console.warn('draw failed', e); }
+                    try { api.draw(); } catch(e){ }
                   });
 
                 } catch (e) {
-                  console.warn('Could not read DataTable API rows count', e);
                 }
               } catch (e) {
-                console.error('DataTable init error:', e);
+                
               }
               return;
             }
@@ -239,7 +228,6 @@ $(document).ready(function () {
           if (attempts < maxAttempts) {
             setTimeout(init, delayMs);
           } else {
-            console.warn('DataTables plugin not found after retries; table will remain plain HTML.');
           }
         }
 
@@ -251,8 +239,8 @@ $(document).ready(function () {
   // Allow other parts of the app to request a refresh after actions (file, cancel, approve)
   // expose a global function so other scripts can call it directly
   window.leaveRefresh = function () {
-    try { loadBalances(); } catch (e) { console.warn('leaveRefresh: loadBalances failed', e); }
-    try { loadLeaves(); } catch (e) { console.warn('leaveRefresh: loadLeaves failed', e); }
+    try { loadBalances(); } catch (e) { }
+    try { loadLeaves(); } catch (e) { }
   };
 
   $(document).on('leave:refresh', function () {

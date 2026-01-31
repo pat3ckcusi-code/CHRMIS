@@ -16,6 +16,20 @@
 include_once('core_javascript.php');
 ?>
 
+<!-- Prevent SweetAlert from using violet as a default button color -->
+<style>
+  .swal2-styled.swal2-confirm {
+    background-color: #3085d6 !important;
+    border-color: #3085d6 !important;
+    color: #fff !important;
+  }
+  .swal2-styled.swal2-cancel {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    color: #fff !important;
+  }
+</style>
+
 <script type="text/javascript">
 	
     // logout action

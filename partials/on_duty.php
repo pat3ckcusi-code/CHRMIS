@@ -33,7 +33,7 @@ try {
                             IFNULL(CONCAT(' ', LEFT(i.Mname, 1), '.'), ''),
                             CASE
                                 WHEN i.Extension IS NULL THEN ''
-                                WHEN LOWER(i.Extension) = 'n/a' THEN ''
+                                WHEN TRIM(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(i.Extension, '.', ''), ' ', ''), '/', ''), '-', ''), ',', ''))) IN ('', 'na') THEN ''
                                 ELSE CONCAT(' ', i.Extension)
                             END
                         )) AS name,

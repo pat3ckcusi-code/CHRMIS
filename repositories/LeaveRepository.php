@@ -219,4 +219,78 @@ class LeaveRepository {
 
         return $leaveId;
     }
+
+    /* ============================
+     * CANCEL A SINGLE LEAVE DATE
+     * Marks a date in `leave_dates` as cancelled, refunds 1 credit, and adjusts filedleave totals
+     */
+    public function cancelLeaveDate(int $leaveId, string $date, int $cancelledBy, ?string $reason = null): bool {
+        $this->pdo->beginTransaction();
+        try {
+            // fetch leave date row
+            $stmt = $this->pdo->prepare("SELECT LeaveDateID, IsCancelled FROM leave_dates WHERE LeaveID = ? AND LeaveDate = ? LIMIT 1");
+            $stmt->execute([$leaveId, $date]);
+            $ld = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$ld) {
+                $this->pdo->rollBack();
+                return false;
+            }
+            if (!empty($ld['IsCancelled'])) {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            // fetch filedleave to determine empno and leave type
+            $stmt = $this->pdo->prepare("SELECT EmpNo, LeaveTypeCode, TotalDays FROM filedleave WHERE LeaveID = ? LIMIT 1");
+            $stmt->execute([$leaveId]);
+            $fl = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$fl) {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            // mark leave_dates row cancelled
+            $upd = $this->pdo->prepare("UPDATE leave_dates SET IsCancelled = 1, CancelledBy = ?, CancelReason = ?, CancelledAt = NOW() WHERE LeaveDateID = ?");
+            $upd->execute([$cancelledBy, $reason, $ld['LeaveDateID']]);
+
+            // decrement filedleave.TotalDays if present
+            $dec = $this->pdo->prepare("UPDATE filedleave SET TotalDays = GREATEST(COALESCE(TotalDays,0) - 1, 0) WHERE LeaveID = ?");
+            $dec->execute([$leaveId]);
+
+            // refund one day to leavecredits depending on LeaveTypeCode
+            $empNo = $fl['EmpNo'];
+            $code = strtoupper(trim((string)($fl['LeaveTypeCode'] ?? '')));
+            $col = null;
+            if ($code === 'VL' || stripos($fl['LeaveTypeCode'] ?? '', 'VAC') !== false) $col = 'VL';
+            elseif ($code === 'SL' || stripos($fl['LeaveTypeCode'] ?? '', 'SICK') !== false) $col = 'SL';
+            elseif ($code === 'CL' || stripos($fl['LeaveTypeCode'] ?? '', 'CASUAL') !== false) $col = 'CL';
+            elseif ($code === 'SPL' || stripos($fl['LeaveTypeCode'] ?? '', 'SPL') !== false) $col = 'SPL';
+            elseif ($code === 'CTO' || stripos($fl['LeaveTypeCode'] ?? '', 'CTO') !== false) $col = 'CTO';
+
+            if ($col !== null) {
+                // if leavecredits row exists update, else insert
+                $chk = $this->pdo->prepare("SELECT EmpNo FROM leavecredits WHERE EmpNo = ? LIMIT 1");
+                $chk->execute([$empNo]);
+                if ($chk->fetch()) {
+                    $this->pdo->prepare("UPDATE leavecredits SET {$col} = COALESCE({$col},0) + 1 WHERE EmpNo = ?")->execute([$empNo]);
+                } else {
+                    // insert minimal row with refunded credit
+                    $ins = $this->pdo->prepare("INSERT INTO leavecredits (EmpNo, VL, SL, CL, SPL, CTO) VALUES (?, ?, 0, 0, 0, 0)");
+                    if ($col === 'VL') $ins->execute([$empNo, 1]);
+                    else $ins->execute([$empNo, 0]);
+                    if ($col === 'SL') $this->pdo->prepare("UPDATE leavecredits SET SL = 1 WHERE EmpNo = ?")->execute([$empNo]);
+                    if ($col === 'CL') $this->pdo->prepare("UPDATE leavecredits SET CL = 1 WHERE EmpNo = ?")->execute([$empNo]);
+                    if ($col === 'SPL') $this->pdo->prepare("UPDATE leavecredits SET SPL = 1 WHERE EmpNo = ?")->execute([$empNo]);
+                    if ($col === 'CTO') $this->pdo->prepare("UPDATE leavecredits SET CTO = 1 WHERE EmpNo = ?")->execute([$empNo]);
+                }
+            }
+
+            $this->pdo->commit();
+            return true;
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            error_log('cancelLeaveDate error: ' . $e->getMessage());
+            return false;
+        }
+    }
 }
